@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ce009168f85e5694abe0d41bca272afc, type: 3}
+  m_Name: GameConfig
+  m_EditorClassIdentifier: Assembly-CSharp::MergeAndMarch.Data.GameConfig
+  columns: 4
+  rows: 2
+  cellSize: 1.15
+  gridOffset: {x: -1.725, y: -3.6}
+  troopBaseScale: 3.6
+  tierTwoScale: 4.3
+  tierThreeScale: 5
+  slotVisualScale: 0.88
+  slotTint: {r: 1, g: 1, b: 1, a: 0.14}
+  tierTwoTint: {r: 1, g: 1, b: 1, a: 1}
+  tierThreeTint: {r: 1, g: 0.95, b: 0.95, a: 1}
+  tacticalSlowTimeScale: 0.2
+  mergeSlideDuration: 0.15
+  mergeFlashDuration: 0.1
+  mergePopDuration: 0.2
+  mergeOvershootScale: 1.3
+  dragReturnDuration: 0.12
+  swapMoveDuration: 0.12
+  enemyBaseScale: 2.2
+  enemySpawnYOffset: 2.2
+  enemyFailOffset: 0.8
+  enemyEngageDistance: 0.3
+  knightMeleeReach: 1.35
+  startingEnemyCount: 3
+  maxEnemiesPerWave: 8
+  startWaveDelay: 0.6
+  timeBetweenWaves: 1.5
