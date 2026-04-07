@@ -6,11 +6,11 @@
 
 ## PROJECT STATUS
 
-**Current Phase:** Phase 1 - Grid + Merge + Basic Combat
-**Session Count:** 4
-**Last Session Date:** 2026-04-03
-**Last Session Summary:** Added lane-guide visuals so column logic reads in battle, removed enemy spawn x-jitter for cleaner lanes, added enemy attack pulse feedback, and gave Knight/Archer target-aware attack motion so combat is more understandable at a glance.
-**Next Task:** Session 5 - tune the new lane/attack readability in play, then add clearer combat feedback such as projectiles, hit/death FX, or wave-state UI before moving on to deployment/cards.
+**Current Phase:** Phase 2 - Roguelike Cards + Enemy Variety
+**Session Count:** 5
+**Last Session Date:** 2026-04-07
+**Last Session Summary:** Added first-pass combat readability feedback (archer projectiles, enemy death shrink/fade, knight impact punch), replaced the old endless wave loop with a 15+boss WaveManager flow, added between-wave troop deployment, added a minimal runtime HUD for wave/coins/run-end state, and wired automatic restart on victory or defeat.
+**Next Task:** Session 6: Roguelike card system (15 starter cards)
 
 ---
 
@@ -38,7 +38,7 @@ Hybrid-casual mobile game. Drag to merge same troops into stronger warriors duri
 Assets/_MergeAndMarch/
 |-- Scripts/
 |   |-- Core/         - RunManager, TimeScaleManager, GridCameraFramer
-|   |-- Gameplay/     - BattleGrid, Troop, MergeController, Enemy, EnemySpawner, AutoCombat
+|   |-- Gameplay/     - BattleGrid, Troop, MergeController, Enemy, EnemySpawner, AutoCombat, DeploymentSystem, WaveManager
 |   |-- Data/         - GameConfig, TroopData, TroopType, EnemyData, EnemyType
 |   |-- Editor/       - Phase1SceneSetupTool
 |-- Prefabs/
@@ -96,13 +96,34 @@ Assets/_MergeAndMarch/
 - [~] Combat is now playable and more understandable, but still visually rough: no projectiles, no death FX, and wave/state feedback is still minimal
 - **Current feel:** The prototype now has a readable battle loop, and the main remaining work is polish/tuning rather than missing combat fundamentals.
 
+### Session 4: Combat readability polish
+- [x] Remove enemy spawn jitter for cleaner lanes
+- [x] Add lane-guide visuals above the battle grid
+- [x] Add enemy attack pulse feedback
+- [x] Add target-aware Knight/Archer attack motion
+- [~] Unity MCP verification was flaky at the end of the session, so play confirmation needed a recheck
+- **Current feel:** Combat columns and attack intent read much better, but ranged hits, deaths, and wave flow still needed support.
+
+### Session 5: First full run loop
+- [x] Archer attacks now fire a visible green projectile and deal damage on projectile arrival
+- [x] Enemies now shrink/fade on death instead of disappearing instantly
+- [x] Knight hits now add a punch-scale impact on enemies alongside the existing flash
+- [x] Create `WaveManager` state-driven flow for waves 1-15 plus boss wave 16
+- [x] Create `DeploymentSystem` and deploy one fresh Tier 1 troop into a random empty slot on waves 2+
+- [x] Update `EnemySpawner` for staggered spawning, wave-clear tracking, boss tuning, and defeat notification
+- [x] Add simple runtime HUD text for wave count, wave cleared, run end, and coins
+- [x] Auto-restart the run 2 seconds after victory or defeat
+- [x] Defeat now triggers on enemy escape or all troops dead
+- [~] Play Mode smoke test passed and the loop runs, but I did not automate a full 15+boss completion from start to finish in-editor yet
+- **Current feel:** The prototype has its first real run structure and is ready to answer whether the between-wave planning loop is fun enough to justify the card layer.
+
 ---
 
 ## CURRENT IMPLEMENTATION NOTES
 
-- Battle layout is now **portrait-only for prototype purposes**.
+- Battle layout is still **portrait-only for prototype purposes**.
 - Grid is centered horizontally and anchored near the bottom of the screen.
-- Enemies are intended to enter from the **top** and move downward.
+- Enemies enter from the **top** and move downward.
 - Starting lineup uses the **center two columns**, not the outer columns.
 - Current tuning in `GameConfig`:
   - `cellSize = 1.15`
@@ -110,18 +131,24 @@ Assets/_MergeAndMarch/
   - `troopBaseScale = 3.6`
   - `tierTwoScale = 4.3`
   - `tierThreeScale = 5.0`
-  - `enemyBaseScale = 2.2`
+  - `enemyBaseScale = 3.2`
   - `laneGuideHeight = 5.8`
   - `laneGuideWidthScale = 0.1`
   - `laneGuideMarkerScale = 0.16`
+  - `enemySpawnIntervalMin = 0.3`
+  - `enemySpawnIntervalMax = 0.5`
 - Camera framing is handled by `GridCameraFramer`.
 - Scene generation is handled by `Phase1SceneSetupTool`.
 - The active battle scene is currently `Assets/Scenes/Game.unity`.
-- Enemy logic currently uses lane-based engagement: enemies stop when they are logically attacking a troop in their assigned column.
-- Lane guides are now rendered at runtime by `BattleGrid` to make column logic readable in battle.
-- Knight and Archer attacks now use simple target-aware motion, while enemy attacks use a small downward pulse.
-- Combat readability is improved with flashes, lane guides, and motion, but there are still no projectiles, attack arcs, death effects, or wave UI.
-- Drag feel is much better after collider fixes, but it should still be tested on device/touch before considering it locked.
+- Archer damage is no longer instant; it now lands on projectile arrival.
+- Enemy logic still uses lane-based engagement: enemies stop when they are logically attacking a troop in their assigned column.
+- `WaveManager` now owns the run lifecycle: wave start, card-pick placeholder, deployment, victory, defeat, and restart.
+- `EnemySpawner` now handles per-wave counts, staggered spawns, HP scaling, the boss wave, and wave-clear tracking.
+- `DeploymentSystem` currently spawns 50/50 Knight vs Archer into a random empty slot before each wave after wave 1.
+- The HUD is created at runtime so the new wave/coin/run-end text appears even if the scene was not manually re-wired yet.
+- BattleGrid now clears dead troops reliably so their slots reopen for next-wave deployment.
+- TextMeshPro fallback code is in place because TMP essentials were missing in this local scene setup during verification.
+- There are still SpriteRenderer tiling warnings on troop placeholder sprites because the current sprite import settings are not using Full Rect; this is cosmetic, not a gameplay blocker.
 
 ---
 
@@ -163,7 +190,7 @@ Assets/_MergeAndMarch/
 - Row 0 (top) = frontline
 - Row 1 (bottom) = backline
 - Grid centered horizontally, anchored to bottom area of portrait screen
-- Enemies will spawn above camera top edge and move downward
+- Enemies spawn above camera top edge and move downward
 - Fail state: enemy passes below the troop rows
 
 ---
@@ -198,6 +225,13 @@ Assets/_MergeAndMarch/
 **Next:** Tune lane guide strength/height and attack motion distances in play, then add clearer ranged/projectile or death feedback.
 **Kill criteria status:** Core battle readability is improving and worth continuing.
 
+### Session 5 - 2026-04-07
+**Duration:** Combat feedback + run loop session
+**Built:** Archer projectile feedback with delayed damage, enemy death shrink/fade, knight impact punch, WaveManager-driven 15+boss run flow, staggered wave spawning, coins tracking, between-wave deployment, boss wave tuning, defeat/victory flow, runtime HUD text, and automatic run restart.
+**Issues:** TMP essentials are now imported and the temporary font fallback has been removed; troop placeholder sprite tiling warnings are fixed by using simple sprite scaling; full hands-off verification of a complete 15+boss win run is still recommended next session.
+**Next:** Build Session 6 card rewards between waves now that the run structure is in place.
+**Kill criteria status:** The game can now support a real start-to-finish run and is ready for the “one more run?” evaluation after tuning.
+
 ---
 
 ## REFERENCE FILES
@@ -205,3 +239,4 @@ Assets/_MergeAndMarch/
 - `MERGE_AND_MARCH_GDD.md` - Full game design document
 - `PHASE1_SETUP.md` - Unity setup notes
 - `CLAUDE_CONTEXT.md` - Session continuity file
+

@@ -144,6 +144,7 @@ namespace MergeAndMarch.Gameplay
                 occupants[troop.Column, troop.Row] = null;
             }
 
+            troop.SetBattleGrid(this);
             occupants[column, row] = troop;
 
             if (moveToSlot)
@@ -173,6 +174,33 @@ namespace MergeAndMarch.Gameplay
             }
         }
 
+
+        public void GetEmptySlots(List<Vector2Int> results)
+        {
+            if (results == null)
+            {
+                return;
+            }
+
+            results.Clear();
+            EnsureOccupantArray();
+
+            if (config == null || occupants == null)
+            {
+                return;
+            }
+
+            for (int column = 0; column < config.columns; column++)
+            {
+                for (int row = 0; row < config.rows; row++)
+                {
+                    if (occupants[column, row] == null)
+                    {
+                        results.Add(new Vector2Int(column, row));
+                    }
+                }
+            }
+        }
         public void GetTroops(List<Troop> results)
         {
             if (results == null)

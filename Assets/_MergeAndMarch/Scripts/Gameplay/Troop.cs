@@ -28,6 +28,7 @@ namespace MergeAndMarch.Gameplay
         private float currentSizeMultiplier = 1f;
         private float visualSizeBoost = 1f;
         private float currentHP;
+        private BattleGrid assignedBattleGrid;
         private Coroutine flashRoutine;
         private Coroutine attackMotionRoutine;
         private bool isDragging;
@@ -43,6 +44,11 @@ namespace MergeAndMarch.Gameplay
             CacheComponents();
             CaptureBaseSpriteSize();
             ConfigureCollider();
+        }
+
+        private void OnDestroy()
+        {
+            assignedBattleGrid?.RemoveTroop(this);
         }
 
         public void Initialize(TroopData troopData, int column, int row, GameConfig config, int tier = 1)
@@ -64,10 +70,8 @@ namespace MergeAndMarch.Gameplay
 
             CaptureBaseSpriteSize();
             spriteRenderer.color = baseColor;
-            spriteRenderer.drawMode = SpriteDrawMode.Sliced;
+            spriteRenderer.drawMode = SpriteDrawMode.Simple;
             defaultSortingOrder = spriteRenderer.sortingOrder;
-
-            transform.localScale = Vector3.one;
             ApplyTierVisuals(config);
             ConfigureCollider();
             currentHP = MaxHP;
@@ -78,6 +82,11 @@ namespace MergeAndMarch.Gameplay
             Column = column;
             Row = row;
             transform.position = worldPosition;
+        }
+
+        public void SetBattleGrid(BattleGrid grid)
+        {
+            assignedBattleGrid = grid;
         }
 
         public void UpgradeTier(GameConfig config)
@@ -197,8 +206,6 @@ namespace MergeAndMarch.Gameplay
                 currentSizeMultiplier = config.tierThreeScale;
                 tint = Color.Lerp(baseColor, config.tierThreeTint, 0.4f);
             }
-
-            transform.localScale = Vector3.one;
             spriteRenderer.color = tint;
             RefreshVisualSize();
         }
@@ -210,7 +217,7 @@ namespace MergeAndMarch.Gameplay
                 return;
             }
 
-            spriteRenderer.size = baseSpriteSize * currentSizeMultiplier * visualSizeBoost;
+            transform.localScale = Vector3.one * currentSizeMultiplier * visualSizeBoost;
             ConfigureCollider();
         }
 
@@ -355,3 +362,4 @@ namespace MergeAndMarch.Gameplay
         }
     }
 }
+

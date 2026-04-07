@@ -1,5 +1,5 @@
-using System.Collections.Generic;
 using System.Collections;
+using System.Collections.Generic;
 using MergeAndMarch.Data;
 using UnityEngine;
 
@@ -21,17 +21,24 @@ namespace MergeAndMarch.Gameplay
         private BattleGrid battleGrid;
         private EnemySpawner owner;
         private float currentHP;
+        private float maxHP;
+        private float attackDamage;
         private float attackTimer;
         private float failY;
         private bool hasEscaped;
+        private bool isDying;
         private Vector2 baseSpriteSize = Vector2.one * 0.16f;
         private Coroutine flashRoutine;
         private Coroutine attackPulseRoutine;
+        private Coroutine impactRoutine;
+        private Coroutine deathRoutine;
         private Vector3 lanePosition;
+        private Vector3 configuredScale = Vector3.one;
 
         public EnemyData Data { get; private set; }
         public int LaneColumn { get; private set; }
-        public bool IsAlive => currentHP > 0.01f;
+        public float MaxHP => maxHP;
+        public bool IsAlive => currentHP > 0.01f && !isDying;
         public static IReadOnlyList<Enemy> ActiveEnemies => activeEnemyBuffer;
 
         private void Reset()
@@ -83,7 +90,8 @@ namespace MergeAndMarch.Gameplay
             attackTimer = Data.attackInterval;
             StartFlash(Color.Lerp(Data.tintColor, Color.white, 0.35f), 0.08f);
             StartAttackPulse();
-            bool troopDied = blockingTroop.ApplyDamage(Data.baseAttack);
+
+            bool troopDied = blockingTroop.ApplyDamage(attackDamage);
             if (troopDied)
             {
                 battleGrid.RemoveTroop(blockingTroop);
@@ -98,7 +106,10 @@ namespace MergeAndMarch.Gameplay
             EnemySpawner enemySpawner,
             int laneColumn,
             Vector3 spawnPosition,
-            float failLineY)
+            float failLineY,
+            float healthMultiplier = 1f,
+            float attackMultiplier = 1f,
+            float scaleMultiplier = 1f)
         {
             Data = enemyData;
             gameConfig = config;
@@ -106,9 +117,12 @@ namespace MergeAndMarch.Gameplay
             owner = enemySpawner;
             LaneColumn = laneColumn;
             failY = failLineY;
-            currentHP = Data != null ? Data.baseHP : 0f;
-            attackTimer = Random.Range(0f, Mathf.Max(0.05f, Data != null ? Data.attackInterval * 0.5f : 0.25f));
+            isDying = false;
             hasEscaped = false;
+            maxHP = Data != null ? Data.baseHP * Mathf.Max(0.01f, healthMultiplier) : 0f;
+            currentHP = maxHP;
+            attackDamage = Data != null ? Data.baseAttack * Mathf.Max(0.01f, attackMultiplier) : 0f;
+            attackTimer = Random.Range(0f, Mathf.Max(0.05f, Data != null ? Data.attackInterval * 0.5f : 0.25f));
             lanePosition = spawnPosition;
 
             name = Data != null ? $"{Data.displayName}_{laneColumn}" : "Enemy";
@@ -125,8 +139,10 @@ namespace MergeAndMarch.Gameplay
                 CaptureBaseSpriteSize();
             }
 
-            transform.localScale = Vector3.one * gameConfig.enemyBaseScale;
+            configuredScale = Vector3.one * gameConfig.enemyBaseScale * Mathf.Max(0.1f, scaleMultiplier);
+            transform.localScale = configuredScale;
             ConfigureCollider();
+            boxCollider.enabled = true;
         }
 
         public bool ApplyDamage(float damage)
@@ -141,11 +157,27 @@ namespace MergeAndMarch.Gameplay
             if (!IsAlive)
             {
                 owner?.NotifyEnemyDefeated(this);
-                Destroy(gameObject);
+                StartDeathSequence();
                 return true;
             }
 
             return false;
+        }
+
+        public void PlayImpactFeedback()
+        {
+            if (isDying || spriteRenderer == null)
+            {
+                return;
+            }
+
+            if (impactRoutine != null)
+            {
+                StopCoroutine(impactRoutine);
+                transform.localScale = configuredScale;
+            }
+
+            impactRoutine = StartCoroutine(ImpactRoutine());
         }
 
         private void MoveForward()
@@ -156,6 +188,7 @@ namespace MergeAndMarch.Gameplay
             {
                 hasEscaped = true;
                 owner?.NotifyEnemyEscaped(this);
+                Destroy(gameObject);
             }
         }
 
@@ -216,6 +249,32 @@ namespace MergeAndMarch.Gameplay
             attackPulseRoutine = StartCoroutine(AttackPulseRoutine());
         }
 
+        private void StartDeathSequence()
+        {
+            if (isDying)
+            {
+                return;
+            }
+
+            isDying = true;
+            currentHP = 0f;
+            boxCollider.enabled = false;
+
+            if (attackPulseRoutine != null)
+            {
+                StopCoroutine(attackPulseRoutine);
+                attackPulseRoutine = null;
+            }
+
+            if (impactRoutine != null)
+            {
+                StopCoroutine(impactRoutine);
+                impactRoutine = null;
+            }
+
+            deathRoutine = StartCoroutine(DeathRoutine());
+        }
+
         private IEnumerator FlashRoutine(Color flashColor, float duration)
         {
             Color original = spriteRenderer.color;
@@ -262,6 +321,47 @@ namespace MergeAndMarch.Gameplay
 
             transform.position = start;
             attackPulseRoutine = null;
+        }
+
+        private IEnumerator ImpactRoutine()
+        {
+            Vector3 startScale = configuredScale;
+            Vector3 punchScale = configuredScale * 1.15f;
+            float duration = 0.1f;
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                float split = t < 0.5f ? t / 0.5f : (t - 0.5f) / 0.5f;
+                transform.localScale = t < 0.5f
+                    ? Vector3.Lerp(startScale, punchScale, split)
+                    : Vector3.Lerp(punchScale, startScale, split);
+                yield return null;
+            }
+
+            transform.localScale = startScale;
+            impactRoutine = null;
+        }
+
+        private IEnumerator DeathRoutine()
+        {
+            Vector3 startScale = transform.localScale;
+            Color startColor = spriteRenderer.color;
+            float duration = 0.15f;
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                transform.localScale = Vector3.Lerp(startScale, Vector3.zero, t);
+                spriteRenderer.color = new Color(startColor.r, startColor.g, startColor.b, Mathf.Lerp(startColor.a, 0f, t));
+                yield return null;
+            }
+
+            Destroy(gameObject);
         }
 
         private static Sprite GetFallbackSprite()
@@ -319,3 +419,4 @@ namespace MergeAndMarch.Gameplay
         }
     }
 }
+

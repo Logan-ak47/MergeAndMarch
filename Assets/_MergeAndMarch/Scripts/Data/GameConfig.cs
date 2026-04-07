@@ -42,11 +42,14 @@ namespace MergeAndMarch.Data
         [Min(0.1f)] public float enemyFailOffset = 0.8f;
         [Min(0.05f)] public float enemyEngageDistance = 0.3f;
         [Min(0.1f)] public float knightMeleeReach = 1.35f;
+        [Min(0.1f)] public float enemySpawnIntervalMin = 0.3f;
+        [Min(0.1f)] public float enemySpawnIntervalMax = 0.5f;
 
         [Header("Waves")]
-        [Min(1)] public int startingEnemyCount = 3;
-        [Min(1)] public int maxEnemiesPerWave = 8;
-        [Min(0.1f)] public float startWaveDelay = 0.6f;
+        [Min(0f)] public float startWaveDelay = 0f;
         [Min(0.1f)] public float timeBetweenWaves = 1.5f;
+        [Min(0.1f)] public float waveClearedBannerDuration = 1f;
+        [Min(0.1f)] public float cardPickPlaceholderDuration = 1f;
+        [Min(0.1f)] public float runEndRestartDelay = 2f;
     }
 }
