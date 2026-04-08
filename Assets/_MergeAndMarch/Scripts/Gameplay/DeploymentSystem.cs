@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using MergeAndMarch.Core;
 using MergeAndMarch.Data;
@@ -46,6 +47,38 @@ namespace MergeAndMarch.Gameplay
             Troop troopInstance = Instantiate(troopPrefab, parent);
             troopInstance.Initialize(troopData, column, row, gameConfig, 1);
             battleGrid.RegisterTroop(troopInstance, column, row);
+            StartCoroutine(PlayDeployPopIn(troopInstance));
+        }
+
+        private IEnumerator PlayDeployPopIn(Troop troop)
+        {
+            if (troop == null)
+            {
+                yield break;
+            }
+
+            Vector3 targetScale = troop.transform.localScale;
+            float duration = 0.2f;
+            float elapsed = 0f;
+            troop.transform.localScale = Vector3.zero;
+
+            while (elapsed < duration)
+            {
+                if (troop == null)
+                {
+                    yield break;
+                }
+
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                troop.transform.localScale = Vector3.Lerp(Vector3.zero, targetScale, t);
+                yield return null;
+            }
+
+            if (troop != null)
+            {
+                troop.transform.localScale = targetScale;
+            }
         }
 
         private void ResolveReferences()
