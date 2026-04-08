@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5972827990e90dd4dbf9441c5472a5d5, type: 3}
+  m_Name: Thorned Armor
+  m_EditorClassIdentifier: Assembly-CSharp::MergeAndMarch.Data.CardData
+  cardName: Thorned Armor
+  description: Knights deal 5 damage when hit
+  icon: {fileID: 0}
+  category: 4
+  rarity: 1
+  cardColor: {r: 0.419608, g: 0.623529, b: 1, a: 1}
+  effectType: 11
+  effectValue: 5
+
+

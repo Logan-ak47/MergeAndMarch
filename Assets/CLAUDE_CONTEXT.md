@@ -7,10 +7,10 @@
 ## PROJECT STATUS
 
 **Current Phase:** Phase 2 - Roguelike Cards + Enemy Variety
-**Session Count:** 5
-**Last Session Date:** 2026-04-07
-**Last Session Summary:** Added first-pass combat readability feedback (archer projectiles, enemy death shrink/fade, knight impact punch), replaced the old endless wave loop with a 15+boss WaveManager flow, added between-wave troop deployment, added a minimal runtime HUD for wave/coins/run-end state, and wired automatic restart on victory or defeat.
-**Next Task:** Session 6: Roguelike card system (15 starter cards)
+**Session Count:** 6
+**Last Session Date:** 2026-04-08
+**Last Session Summary:** Built the full Phase 2 starter card system: card data architecture, 15 starter card assets, runtime card selection logic with weighted rarity rolls, buff tracking across a run, a simple 3-card selection UI, and gameplay wiring so cards now affect combat, merges, deployment, HP, and coins.
+**Next Task:** Session 7: Mage, Healer, Bomber troop types
 
 ---
 
@@ -38,11 +38,13 @@ Hybrid-casual mobile game. Drag to merge same troops into stronger warriors duri
 Assets/_MergeAndMarch/
 |-- Scripts/
 |   |-- Core/         - RunManager, TimeScaleManager, GridCameraFramer
-|   |-- Gameplay/     - BattleGrid, Troop, MergeController, Enemy, EnemySpawner, AutoCombat, DeploymentSystem, WaveManager
-|   |-- Data/         - GameConfig, TroopData, TroopType, EnemyData, EnemyType
+|   |-- Gameplay/     - BattleGrid, Troop, MergeController, Enemy, EnemySpawner, AutoCombat, DeploymentSystem, WaveManager, CardSystem, RunBuffs
+|   |-- Data/         - GameConfig, TroopData, TroopType, EnemyData, EnemyType, CardData, CardCategory, CardRarity, CardEffectType
+|   |-- UI/           - CardSelectionUI
 |   |-- Editor/       - Phase1SceneSetupTool
 |-- Prefabs/
 |-- ScriptableObjects/
+|   |-- Cards/        - 15 starter card assets
 |-- Scenes/
 |   |-- Game.unity
 ```
@@ -100,7 +102,7 @@ Assets/_MergeAndMarch/
 - [x] Remove enemy spawn jitter for cleaner lanes
 - [x] Add lane-guide visuals above the battle grid
 - [x] Add enemy attack pulse feedback
-- [x] Add target-aware Knight/Archer attack motion
+- [x] Add target-aware Knight/Archers attack motion
 - [~] Unity MCP verification was flaky at the end of the session, so play confirmation needed a recheck
 - **Current feel:** Combat columns and attack intent read much better, but ranged hits, deaths, and wave flow still needed support.
 
@@ -114,8 +116,22 @@ Assets/_MergeAndMarch/
 - [x] Add simple runtime HUD text for wave count, wave cleared, run end, and coins
 - [x] Auto-restart the run 2 seconds after victory or defeat
 - [x] Defeat now triggers on enemy escape or all troops dead
+- [x] TMP import and troop sprite-scaling follow-up cleanup completed after the session
 - [~] Play Mode smoke test passed and the loop runs, but I did not automate a full 15+boss completion from start to finish in-editor yet
 - **Current feel:** The prototype has its first real run structure and is ready to answer whether the between-wave planning loop is fun enough to justify the card layer.
+
+### Session 6: Roguelike card system
+- [x] Create `CardData`, `CardCategory`, `CardRarity`, and `CardEffectType`
+- [x] Create 15 starter `CardData` assets with exact starter values
+- [x] Create `RunBuffs` runtime state container
+- [x] Create `CardSystem` with weighted 3-card selection and no duplicates in a single pick
+- [x] Create `CardSelectionUI` with 3 tappable runtime cards showing name, description, and rarity
+- [x] Replace wave-card placeholder with actual card-pick flow after waves 3, 6, 9, 12, and 15
+- [x] Apply card effects into combat, merge behavior, HP, deployment count, spawn cards, and coins
+- [x] Reset run buffs on each new run
+- [x] Keep deploy pop-in animation for deployed and spawned troops
+- [~] Compile and Play Mode smoke tests are clean, but I did not do a full manual wave-3-through-wave-15 card-feel balancing pass yet
+- **Current feel:** The run now has real strategic pivots between waves, which should meaningfully improve replayability once card balance is tuned.
 
 ---
 
@@ -142,13 +158,17 @@ Assets/_MergeAndMarch/
 - The active battle scene is currently `Assets/Scenes/Game.unity`.
 - Archer damage is no longer instant; it now lands on projectile arrival.
 - Enemy logic still uses lane-based engagement: enemies stop when they are logically attacking a troop in their assigned column.
-- `WaveManager` now owns the run lifecycle: wave start, card-pick placeholder, deployment, victory, defeat, and restart.
-- `EnemySpawner` now handles per-wave counts, staggered spawns, HP scaling, the boss wave, and wave-clear tracking.
-- `DeploymentSystem` currently spawns 50/50 Knight vs Archer into a random empty slot before each wave after wave 1.
-- The HUD is created at runtime so the new wave/coin/run-end text appears even if the scene was not manually re-wired yet.
-- BattleGrid now clears dead troops reliably so their slots reopen for next-wave deployment.
-- TextMeshPro fallback code is in place because TMP essentials were missing in this local scene setup during verification.
-- There are still SpriteRenderer tiling warnings on troop placeholder sprites because the current sprite import settings are not using Full Rect; this is cosmetic, not a gameplay blocker.
+- `WaveManager` now owns the run lifecycle: wave start, card pick, deployment, victory, defeat, and restart.
+- `CardSystem` now owns run buffs, weighted card rolls, effect application, and card-pick completion signaling.
+- `CardSelectionUI` builds a simple runtime 3-card selection panel on the overlay canvas.
+- `EnemySpawner` handles per-wave counts, staggered spawns, HP scaling, the boss wave, and wave-clear tracking.
+- `DeploymentSystem` can now deploy multiple troops for a single wave and also handles card-driven troop spawn effects.
+- `MergeController` now consumes one-shot merge boosts and applies merge-heal buffs to adjacent troops.
+- `AutoCombat` reads attack and speed modifiers from `RunBuffs`, and `Enemy` applies Knight thorns when appropriate.
+- `Troop.MaxHP` now respects run HP buffs, and HP-boost cards heal the granted difference immediately.
+- BattleGrid clears dead troops reliably so their slots reopen for next-wave deployment and revive/spawn cards.
+- TextMeshPro is imported and the temporary fallback path is no longer needed.
+- Troop placeholder sprite tiling warnings were removed by switching to simple sprite scaling.
 
 ---
 
@@ -232,6 +252,14 @@ Assets/_MergeAndMarch/
 **Next:** Build Session 6 card rewards between waves now that the run structure is in place.
 **Kill criteria status:** The game can now support a real start-to-finish run and is ready for the “one more run?” evaluation after tuning.
 
+### Session 6 - 2026-04-08
+**Duration:** Roguelike cards session
+**Built:** Card data architecture, 15 starter card assets, weighted runtime card selection, RunBuffs runtime state, simple 3-card selection UI, and gameplay wiring so cards now affect attack, HP, speed, thorns, merge upgrades, merge healing, deployment count, troop spawns, and coins.
+**Issues:** The system compiles and smoke-tests cleanly, but I have not yet done a full manual balancing pass across repeated wave-3/6/9/12/15 choices or a complete end-to-end run where every major card category is exercised deliberately.
+**Next:** Add Mage, Healer, and Bomber troop types for Session 7.
+**Card feel testing:** Not fully hands-on balanced yet. Provisional expectation is that Fusion Surge, spawn cards, and Bounty Hunter will feel strongest immediately; Merge Aura and Iron Skin may read weaker until combat pressure and board damage are tuned more aggressively.
+**Kill criteria status:** The run now has real strategic variation between waves and is much closer to a true “one more run” loop.
+
 ---
 
 ## REFERENCE FILES
@@ -239,4 +267,3 @@ Assets/_MergeAndMarch/
 - `MERGE_AND_MARCH_GDD.md` - Full game design document
 - `PHASE1_SETUP.md` - Unity setup notes
 - `CLAUDE_CONTEXT.md` - Session continuity file
-

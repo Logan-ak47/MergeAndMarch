@@ -18,7 +18,7 @@ namespace MergeAndMarch.Gameplay
         public SpriteRenderer Renderer => spriteRenderer;
         public BoxCollider2D Collider => boxCollider;
         public float CurrentHP => currentHP;
-        public float MaxHP => Data == null ? 0f : Data.baseHP * GetTierStatMultiplier();
+        public float MaxHP => Data == null ? 0f : Data.baseHP * GetTierStatMultiplier() * GetHpMultiplier();
         public bool IsAlive => currentHP > 0.01f;
 
         private Color baseColor;
@@ -91,12 +91,13 @@ namespace MergeAndMarch.Gameplay
 
         public void UpgradeTier(GameConfig config)
         {
+            float oldMaxHp = MaxHP;
             currentConfig = config;
             Tier = Mathf.Clamp(Tier + 1, 1, 3);
             visualSizeBoost = 1f;
             ApplyTierVisuals(config);
             ConfigureCollider();
-            currentHP = MaxHP;
+            RefreshCurrentHpForMaxHpChange(oldMaxHp, true);
         }
 
         public bool CanMergeWith(Troop other)
@@ -155,6 +156,37 @@ namespace MergeAndMarch.Gameplay
         public float GetAttackInterval()
         {
             return Data == null ? 1f : Data.attackInterval * GetAttackIntervalMultiplier();
+        }
+
+        public void RefreshCurrentHpForMaxHpChange(float oldMaxHp, bool healDifference)
+        {
+            float newMaxHp = MaxHP;
+            if (healDifference)
+            {
+                currentHP += Mathf.Max(0f, newMaxHp - oldMaxHp);
+            }
+
+            currentHP = Mathf.Clamp(currentHP, 0f, newMaxHp);
+        }
+
+        public void HealPercent(float percent)
+        {
+            if (!IsAlive)
+            {
+                return;
+            }
+
+            HealFlat(MaxHP * Mathf.Max(0f, percent));
+        }
+
+        public void HealFlat(float amount)
+        {
+            if (!IsAlive)
+            {
+                return;
+            }
+
+            currentHP = Mathf.Clamp(currentHP + Mathf.Max(0f, amount), 0f, MaxHP);
         }
 
         public void PlayAttackFeedback(Vector3 targetWorldPosition)
@@ -323,6 +355,11 @@ namespace MergeAndMarch.Gameplay
             attackMotionRoutine = null;
         }
 
+        private float GetHpMultiplier()
+        {
+            return CardSystem.Instance != null ? CardSystem.Instance.runBuffs.hpMultiplier : 1f;
+        }
+
         private void CacheComponents()
         {
             if (spriteRenderer == null)
@@ -362,4 +399,3 @@ namespace MergeAndMarch.Gameplay
         }
     }
 }
-

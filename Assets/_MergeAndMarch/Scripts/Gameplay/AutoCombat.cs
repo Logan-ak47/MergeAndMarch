@@ -52,7 +52,7 @@ namespace MergeAndMarch.Gameplay
 
                 if (!attackCooldowns.ContainsKey(troop))
                 {
-                    attackCooldowns[troop] = Random.Range(0f, Mathf.Max(0.05f, troop.GetAttackInterval() * 0.5f));
+                    attackCooldowns[troop] = Random.Range(0f, Mathf.Max(0.05f, GetAttackIntervalFor(troop) * 0.5f));
                 }
 
                 float cooldown = attackCooldowns[troop] - Time.deltaTime;
@@ -71,7 +71,7 @@ namespace MergeAndMarch.Gameplay
 
                 troop.PlayAttackFeedback(target.transform.position);
                 ResolveAttack(troop, target);
-                attackCooldowns[troop] = troop.GetAttackInterval();
+                attackCooldowns[troop] = GetAttackIntervalFor(troop);
             }
         }
 
@@ -98,13 +98,13 @@ namespace MergeAndMarch.Gameplay
                     continue;
                 }
 
-                attackCooldowns[troop] = Random.Range(0.05f, Mathf.Max(0.1f, troop.GetAttackInterval() * 0.5f));
+                attackCooldowns[troop] = Random.Range(0.05f, Mathf.Max(0.1f, GetAttackIntervalFor(troop) * 0.5f));
             }
         }
 
         private void ResolveAttack(Troop troop, Enemy target)
         {
-            float damage = troop.GetAttackDamage();
+            float damage = GetAttackDamageFor(troop);
             if (troop.Data.troopType == TroopType.Archer)
             {
                 StartCoroutine(FireProjectileRoutine(troop, target, damage));
@@ -194,6 +194,40 @@ namespace MergeAndMarch.Gameplay
             }
 
             Destroy(projectile);
+        }
+
+        private float GetAttackDamageFor(Troop troop)
+        {
+            float damage = troop.GetAttackDamage();
+            RunBuffs buffs = CardSystem.Instance != null ? CardSystem.Instance.runBuffs : null;
+            if (buffs == null)
+            {
+                return damage;
+            }
+
+            damage *= buffs.attackMultiplier;
+            if (troop.Data.troopType == TroopType.Knight)
+            {
+                damage *= buffs.knightAttackMultiplier;
+            }
+            else if (troop.Data.troopType == TroopType.Archer)
+            {
+                damage *= buffs.archerAttackMultiplier;
+            }
+
+            return damage;
+        }
+
+        private float GetAttackIntervalFor(Troop troop)
+        {
+            float interval = troop.GetAttackInterval();
+            RunBuffs buffs = CardSystem.Instance != null ? CardSystem.Instance.runBuffs : null;
+            if (buffs != null && troop.Data != null && troop.Data.troopType == TroopType.Archer)
+            {
+                interval *= buffs.archerSpeedMultiplier;
+            }
+
+            return interval;
         }
 
         private void ResolveReferences()

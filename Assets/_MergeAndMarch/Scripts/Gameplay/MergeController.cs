@@ -189,13 +189,48 @@ namespace MergeAndMarch.Gameplay
                 Destroy(source.gameObject);
             }
 
+            bool boostedMerge = CardSystem.Instance != null && CardSystem.Instance.ConsumeNextMergeBoost();
             target.UpgradeTier(gameConfig);
+            if (boostedMerge && target.Tier < 3)
+            {
+                target.UpgradeTier(gameConfig);
+            }
+
             target.SetVisualSizeBoost(gameConfig.mergeOvershootScale);
             yield return AnimateVisualSizeBoost(target, 1f, gameConfig.mergePopDuration);
+            ApplyMergeHeal(target);
 
             draggedTroop = null;
             isResolving = false;
             RestoreTime();
+        }
+
+        private void ApplyMergeHeal(Troop mergeTarget)
+        {
+            if (mergeTarget == null || CardSystem.Instance == null)
+            {
+                return;
+            }
+
+            float healPercent = CardSystem.Instance.runBuffs.mergeHealPercent;
+            if (healPercent <= 0f)
+            {
+                return;
+            }
+
+            HealTroopAt(mergeTarget.Column - 1, mergeTarget.Row, healPercent);
+            HealTroopAt(mergeTarget.Column + 1, mergeTarget.Row, healPercent);
+            HealTroopAt(mergeTarget.Column, mergeTarget.Row - 1, healPercent);
+            HealTroopAt(mergeTarget.Column, mergeTarget.Row + 1, healPercent);
+        }
+
+        private void HealTroopAt(int column, int row, float healPercent)
+        {
+            Troop troop = battleGrid.GetTroopAt(column, row);
+            if (troop != null)
+            {
+                troop.HealPercent(healPercent);
+            }
         }
 
         private void RestoreTime()

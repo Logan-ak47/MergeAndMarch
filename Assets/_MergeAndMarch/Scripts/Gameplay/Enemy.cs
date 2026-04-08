@@ -92,6 +92,7 @@ namespace MergeAndMarch.Gameplay
             StartAttackPulse();
 
             bool troopDied = blockingTroop.ApplyDamage(attackDamage);
+            ApplyKnightThorns(blockingTroop);
             if (troopDied)
             {
                 battleGrid.RemoveTroop(blockingTroop);
@@ -222,6 +223,22 @@ namespace MergeAndMarch.Gameplay
             }
 
             return best;
+        }
+
+        private void ApplyKnightThorns(Troop troop)
+        {
+            if (troop == null || troop.Data == null || troop.Data.troopType != TroopType.Knight)
+            {
+                return;
+            }
+
+            RunBuffs buffs = CardSystem.Instance != null ? CardSystem.Instance.runBuffs : null;
+            if (buffs == null || buffs.knightThornsDamage <= 0f)
+            {
+                return;
+            }
+
+            ApplyDamage(buffs.knightThornsDamage);
         }
 
         private void StartFlash(Color flashColor, float duration)
@@ -419,4 +436,3 @@ namespace MergeAndMarch.Gameplay
         }
     }
 }
-

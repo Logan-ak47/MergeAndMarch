@@ -20,7 +20,36 @@ namespace MergeAndMarch.Gameplay
         [SerializeField] private TroopData archerData;
         [SerializeField] private Transform troopRoot;
 
+        public int DeployTroopsForNextWave()
+        {
+            ResolveReferences();
+            int deployCount = 1;
+            if (CardSystem.Instance != null)
+            {
+                deployCount += Mathf.Max(0, CardSystem.Instance.runBuffs.extraDeployCount);
+                CardSystem.Instance.runBuffs.extraDeployCount = 0;
+            }
+
+            int deployed = 0;
+            for (int i = 0; i < deployCount; i++)
+            {
+                if (!SpawnTroopInEmptySlot(null))
+                {
+                    break;
+                }
+
+                deployed++;
+            }
+
+            return deployed;
+        }
+
         public bool DeployOneTroop()
+        {
+            return SpawnTroopInEmptySlot(null);
+        }
+
+        public bool SpawnTroopInEmptySlot(TroopType? forcedType, bool animate = true)
         {
             ResolveReferences();
             if (battleGrid == null || troopPrefab == null || gameConfig == null || knightData == null || archerData == null)
@@ -36,18 +65,42 @@ namespace MergeAndMarch.Gameplay
             }
 
             Vector2Int slot = emptySlots[Random.Range(0, emptySlots.Count)];
-            TroopData troopData = Random.value < 0.5f ? knightData : archerData;
-            SpawnTroop(troopData, slot.x, slot.y);
+            TroopData troopData = GetTroopData(forcedType);
+            if (troopData == null)
+            {
+                return false;
+            }
+
+            SpawnTroop(troopData, slot.x, slot.y, animate);
             return true;
         }
 
-        private void SpawnTroop(TroopData troopData, int column, int row)
+        private void SpawnTroop(TroopData troopData, int column, int row, bool animate)
         {
             Transform parent = troopRoot != null ? troopRoot : transform;
             Troop troopInstance = Instantiate(troopPrefab, parent);
             troopInstance.Initialize(troopData, column, row, gameConfig, 1);
             battleGrid.RegisterTroop(troopInstance, column, row);
-            StartCoroutine(PlayDeployPopIn(troopInstance));
+
+            if (animate)
+            {
+                StartCoroutine(PlayDeployPopIn(troopInstance));
+            }
+        }
+
+        private TroopData GetTroopData(TroopType? forcedType)
+        {
+            if (!forcedType.HasValue)
+            {
+                return Random.value < 0.5f ? knightData : archerData;
+            }
+
+            return forcedType.Value switch
+            {
+                TroopType.Knight => knightData,
+                TroopType.Archer => archerData,
+                _ => Random.value < 0.5f ? knightData : archerData
+            };
         }
 
         private IEnumerator PlayDeployPopIn(Troop troop)

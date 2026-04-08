@@ -28,15 +28,18 @@ namespace MergeAndMarch.Gameplay
         [SerializeField] private DeploymentSystem deploymentSystem;
         [SerializeField] private AutoCombat autoCombat;
         [SerializeField] private RunManager runManager;
+        [SerializeField] private CardSystem cardSystem;
 
         private Coroutine runRoutine;
         private Coroutine restartRoutine;
-        private Canvas hudCanvas;        private TextMeshProUGUI waveCounterText;
+        private Canvas hudCanvas;
+        private TextMeshProUGUI waveCounterText;
         private TextMeshProUGUI coinCounterText;
         private TextMeshProUGUI waveClearedText;
         private TextMeshProUGUI runEndText;
         private bool runActive;
         private bool runEnded;
+        private bool cardPickCompleted;
         private int currentWave;
         private int totalCoins;
 
@@ -48,6 +51,10 @@ namespace MergeAndMarch.Gameplay
         {
             ResolveReferences();
             EnsureHud();
+            if (cardSystem != null)
+            {
+                cardSystem.CardPickCompleted += HandleCardPickCompleted;
+            }
         }
 
         private void OnDisable()
@@ -55,6 +62,11 @@ namespace MergeAndMarch.Gameplay
             if (enemySpawner != null)
             {
                 enemySpawner.EnemyEscapedEvent -= HandleEnemyEscaped;
+            }
+
+            if (cardSystem != null)
+            {
+                cardSystem.CardPickCompleted -= HandleCardPickCompleted;
             }
         }
 
@@ -94,6 +106,7 @@ namespace MergeAndMarch.Gameplay
                 enemySpawner.ResetSpawner();
             }
 
+            cardSystem?.ResetRunBuffs();
             autoCombat?.SetCombatEnabled(true);
             autoCombat?.ResetAttackTimers();
             currentWave = 0;
@@ -126,7 +139,7 @@ namespace MergeAndMarch.Gameplay
                     }
 
                     State = WaveState.Deploying;
-                    deploymentSystem?.DeployOneTroop();
+                    deploymentSystem?.DeployTroopsForNextWave();
                     autoCombat?.ResetAttackTimers();
                 }
 
@@ -163,16 +176,19 @@ namespace MergeAndMarch.Gameplay
             yield return new WaitForSecondsRealtime(gameConfig.waveClearedBannerDuration);
             waveClearedText.gameObject.SetActive(false);
 
-            if (IsCardPickWave(clearedWave))
+            if (IsCardPickWave(clearedWave) && cardSystem != null)
             {
                 State = WaveState.CardPick;
-                yield return new WaitForSecondsRealtime(gameConfig.cardPickPlaceholderDuration);
+                cardPickCompleted = false;
+                cardSystem.StartCardPick();
+                yield return new WaitUntil(() => runEnded || cardPickCompleted);
             }
         }
 
         private void AwardCoins(int amount)
         {
-            totalCoins += amount;
+            float multiplier = cardSystem != null ? cardSystem.runBuffs.coinMultiplier : 1f;
+            totalCoins += Mathf.RoundToInt(amount * multiplier);
             UpdateCoinCounter();
         }
 
@@ -219,6 +235,11 @@ namespace MergeAndMarch.Gameplay
             TriggerDefeat();
         }
 
+        private void HandleCardPickCompleted()
+        {
+            cardPickCompleted = true;
+        }
+
         private bool IsCardPickWave(int waveNumber)
         {
             return waveNumber == 3 || waveNumber == 6 || waveNumber == 9 || waveNumber == 12 || waveNumber == 15;
@@ -258,6 +279,15 @@ namespace MergeAndMarch.Gameplay
             if (autoCombat == null)
             {
                 autoCombat = FindFirstObjectByType<AutoCombat>();
+            }
+
+            if (cardSystem == null && runManager != null)
+            {
+                cardSystem = runManager.GetComponent<CardSystem>();
+                if (cardSystem == null)
+                {
+                    cardSystem = runManager.gameObject.AddComponent<CardSystem>();
+                }
             }
         }
 
@@ -330,13 +360,13 @@ namespace MergeAndMarch.Gameplay
             }
 
             text.font = TMP_Settings.defaultFontAsset;
-
             text.fontSize = fontSize;
             text.alignment = alignment;
             text.color = Color.white;
             text.text = string.Empty;
             return text;
         }
+
         private void UpdateWaveCounter()
         {
             if (waveCounterText == null)
@@ -382,5 +412,3 @@ namespace MergeAndMarch.Gameplay
         }
     }
 }
-
-
