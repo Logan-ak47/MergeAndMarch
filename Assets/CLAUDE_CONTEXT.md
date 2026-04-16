@@ -1,4 +1,4 @@
-# MERGE & MARCH - Claude Code Context File
+Ôªø# MERGE & MARCH - Claude Code Context File
 # UPDATE THIS FILE at the end of every session.
 # Read this file at the START of every session.
 
@@ -7,10 +7,10 @@
 ## PROJECT STATUS
 
 **Current Phase:** Phase 2 - Roguelike Cards + Enemy Variety
-**Session Count:** 6
-**Last Session Date:** 2026-04-08
-**Last Session Summary:** Built the full Phase 2 starter card system: card data architecture, 15 starter card assets, runtime card selection logic with weighted rarity rolls, buff tracking across a run, a simple 3-card selection UI, and gameplay wiring so cards now affect combat, merges, deployment, HP, and coins.
-**Next Task:** Session 7: Mage, Healer, Bomber troop types
+**Session Count:** 7
+**Last Session Date:** 2026-04-16
+**Last Session Summary:** Added Mage, Healer, and Bomber as full troop types with distinct mechanics: Mage now uses AoE band attacks with a visible purple sweep, Healer now heals the lowest-HP adjacent ally with a green pulse, and Bomber now explodes on enemy row contact, deactivates for the wave, and respawns next wave. Also added weighted deployment support for Mage/Healer, 5 new troop-specific cards, explicit troop targeting data, and optional debug lineup hotkeys.
+**Next Task:** Session 8: Enemy variety (Rusher, Tank, Flyer)
 
 ---
 
@@ -39,12 +39,12 @@ Assets/_MergeAndMarch/
 |-- Scripts/
 |   |-- Core/         - RunManager, TimeScaleManager, GridCameraFramer
 |   |-- Gameplay/     - BattleGrid, Troop, MergeController, Enemy, EnemySpawner, AutoCombat, DeploymentSystem, WaveManager, CardSystem, RunBuffs
-|   |-- Data/         - GameConfig, TroopData, TroopType, EnemyData, EnemyType, CardData, CardCategory, CardRarity, CardEffectType
+|   |-- Data/         - GameConfig, TroopData, TroopType, TroopTargeting, EnemyData, EnemyType, CardData, CardCategory, CardRarity, CardEffectType
 |   |-- UI/           - CardSelectionUI
 |   |-- Editor/       - Phase1SceneSetupTool
 |-- Prefabs/
 |-- ScriptableObjects/
-|   |-- Cards/        - 15 starter card assets
+|   |-- Cards/        - 20 starter card assets
 |-- Scenes/
 |   |-- Game.unity
 ```
@@ -133,6 +133,19 @@ Assets/_MergeAndMarch/
 - [~] Compile and Play Mode smoke tests are clean, but I did not do a full manual wave-3-through-wave-15 card-feel balancing pass yet
 - **Current feel:** The run now has real strategic pivots between waves, which should meaningfully improve replayability once card balance is tuned.
 
+### Session 7: Mage, Healer, Bomber troop types
+- [x] Create `Mage`, `Healer`, and `Bomber` `TroopData` assets with correct prototype stats
+- [x] Add explicit `TroopTargeting` data so troop behavior is data-driven instead of inferred only from type
+- [x] Implement Mage AoE band attacks using nearest-enemy-by-Y targeting plus a full-width purple wave visual
+- [x] Implement Healer support pulses targeting the lowest-HP adjacent ally with a green "+" effect
+- [x] Implement Bomber single-use explosion behavior with row-contact triggering, AoE damage, wave reset, and inactive-state drag/merge lockout after explosion
+- [x] Move Bomber triggering into `Enemy.Update` row-zone checks so the explosion happens on contact rather than on a normal combat timer
+- [x] Add weighted deployment support so the non-Bomber deployment pool now includes Knight, Archer, Mage, and Healer with extra weight based on starting composition
+- [x] Add 5 new troop-specific cards: Arcane Surge, Spawn Mage, Divine Light, Detonation, and Chain Reaction
+- [x] Add optional debug lineup hotkeys in `RunManager` for fast composition playtesting (`1` all Knights, `2` default, `3` experimental Mage/Healer/Bomber mix)
+- [~] Code compiles cleanly, but I have not yet done the requested 10+ hands-on composition test runs, so troop feel notes below are still provisional rather than playtest-validated
+- **Current feel:** Mage has the clearest new battlefield read because the purple sweep communicates value instantly. Healer looks strategically promising because adjacency matters now, but may still read weaker than Mage until more sustained damage pressure is present in runs. Bomber should feel dramatic when it lands, but needs hands-on testing to confirm whether the trap timing feels smart or merely swingy.
+
 ---
 
 ## CURRENT IMPLEMENTATION NOTES
@@ -162,13 +175,19 @@ Assets/_MergeAndMarch/
 - `CardSystem` now owns run buffs, weighted card rolls, effect application, and card-pick completion signaling.
 - `CardSelectionUI` builds a simple runtime 3-card selection panel on the overlay canvas.
 - `EnemySpawner` handles per-wave counts, staggered spawns, HP scaling, the boss wave, and wave-clear tracking.
-- `DeploymentSystem` can now deploy multiple troops for a single wave and also handles card-driven troop spawn effects.
+- `DeploymentSystem` can now deploy multiple troops for a single wave, handles card-driven troop spawn effects, excludes Bomber from random deployment, and weights normal deployments toward the starting lineup composition.
 - `MergeController` now consumes one-shot merge boosts and applies merge-heal buffs to adjacent troops.
-- `AutoCombat` reads attack and speed modifiers from `RunBuffs`, and `Enemy` applies Knight thorns when appropriate.
+- `AutoCombat` now routes troop actions through explicit targeting types: ranged/melee attacks, Mage AoE bands, and Healer support pulses. Bomber triggering is handled by enemy row contact instead of the normal combat tick.
+- `Enemy` now handles Bomber row-contact triggering and still applies Knight thorns when appropriate.
 - `Troop.MaxHP` now respects run HP buffs, and HP-boost cards heal the granted difference immediately.
+- `Troop` now supports single-use Bomber behavior, `HasExplodedThisWave`, bomber respawn/reset on wave start, inactive-state drag lockout, and tier-scaled healer support power.
 - BattleGrid clears dead troops reliably so their slots reopen for next-wave deployment and revive/spawn cards.
+- The three new troop visuals are currently communicated with lightweight prototype FX: Mage purple sweep, Healer green pulse, and Bomber orange explosion circle.
+- Starting lineup is still the default 2 Knights + 2 Archers for production flow, but the runtime now supports all 5 troop types and includes optional keyboard lineup presets for faster testing.
 - TextMeshPro is imported and the temporary fallback path is no longer needed.
 - Troop placeholder sprite tiling warnings were removed by switching to simple sprite scaling.
+- There are now 20 starter cards in the pool instead of 15.
+- I have not yet completed the requested 10+ manual playtest runs with different compositions, so strength/weakness judgments are currently based on implementation expectations rather than direct play sessions.
 
 ---
 
@@ -250,7 +269,7 @@ Assets/_MergeAndMarch/
 **Built:** Archer projectile feedback with delayed damage, enemy death shrink/fade, knight impact punch, WaveManager-driven 15+boss run flow, staggered wave spawning, coins tracking, between-wave deployment, boss wave tuning, defeat/victory flow, runtime HUD text, and automatic run restart.
 **Issues:** TMP essentials are now imported and the temporary font fallback has been removed; troop placeholder sprite tiling warnings are fixed by using simple sprite scaling; full hands-off verification of a complete 15+boss win run is still recommended next session.
 **Next:** Build Session 6 card rewards between waves now that the run structure is in place.
-**Kill criteria status:** The game can now support a real start-to-finish run and is ready for the ìone more run?î evaluation after tuning.
+**Kill criteria status:** The game can now support a real start-to-finish run and is ready for the ‚Äúone more run?‚Äù evaluation after tuning.
 
 ### Session 6 - 2026-04-08
 **Duration:** Roguelike cards session
@@ -258,7 +277,15 @@ Assets/_MergeAndMarch/
 **Issues:** The system compiles and smoke-tests cleanly, but I have not yet done a full manual balancing pass across repeated wave-3/6/9/12/15 choices or a complete end-to-end run where every major card category is exercised deliberately.
 **Next:** Add Mage, Healer, and Bomber troop types for Session 7.
 **Card feel testing:** Not fully hands-on balanced yet. Provisional expectation is that Fusion Surge, spawn cards, and Bounty Hunter will feel strongest immediately; Merge Aura and Iron Skin may read weaker until combat pressure and board damage are tuned more aggressively.
-**Kill criteria status:** The run now has real strategic variation between waves and is much closer to a true ìone more runî loop.
+**Kill criteria status:** The run now has real strategic variation between waves and is much closer to a true ‚Äúone more run‚Äù loop.
+
+### Session 7 - 2026-04-16
+**Duration:** New troop types + support systems session
+**Built:** Mage AoE band combat with full-width purple sweep, Healer adjacency-based support pulses, Bomber row-contact explosion behavior with wave reset, explicit troop targeting data, Bomber inactive-state drag/merge lockout, weighted deployment using starting composition, 5 new troop-specific cards, and optional debug lineup hotkeys for composition testing.
+**Issues:** I have not yet done the requested 10+ manual composition test runs, so troop feel is still provisional; Mage is expected to read best immediately because its effect is the most visible, while Healer may feel weakest until sustained incoming damage makes support value more obvious. Bomber trap timing and radius value still need hands-on validation.
+**Next:** Build Session 8 enemy variety with Rusher, Tank, and Flyer.
+**Provisional troop feel:** Mage currently looks like the strongest readability win, Healer is most likely to need tuning or stronger combat pressure to feel impactful, and Bomber may need trap timing/radius tuning depending on how often waves naturally enter its trigger zone.
+**Kill criteria status:** The troop roster now has real mechanical variety, but composition quality and relative troop value still need live playtesting to confirm.
 
 ---
 
@@ -267,3 +294,4 @@ Assets/_MergeAndMarch/
 - `MERGE_AND_MARCH_GDD.md` - Full game design document
 - `PHASE1_SETUP.md` - Unity setup notes
 - `CLAUDE_CONTEXT.md` - Session continuity file
+

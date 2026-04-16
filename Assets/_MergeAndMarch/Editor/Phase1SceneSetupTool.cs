@@ -30,6 +30,7 @@ namespace MergeAndMarch.Editor
                 "Knight",
                 TroopType.Knight,
                 "Knight",
+                TroopTargeting.Melee,
                 new Color(0.2667f, 0.5333f, 1f),
                 100f,
                 15f,
@@ -40,10 +41,45 @@ namespace MergeAndMarch.Editor
                 "Archer",
                 TroopType.Archer,
                 "Archer",
+                TroopTargeting.Ranged,
                 new Color(0.2667f, 1f, 0.5333f),
                 40f,
                 12f,
                 0.8f,
+                squareSprite);
+
+            TroopData mageData = EnsureTroopData(
+                "Mage",
+                TroopType.Mage,
+                "Mage",
+                TroopTargeting.AoEBand,
+                new Color(0.7333f, 0.4196f, 1f),
+                35f,
+                25f,
+                2.5f,
+                squareSprite);
+
+            TroopData healerData = EnsureTroopData(
+                "Healer",
+                TroopType.Healer,
+                "Healer",
+                TroopTargeting.HealLowestHP,
+                new Color(1f, 0.9843f, 0.8784f),
+                60f,
+                0f,
+                3f,
+                squareSprite,
+                15f);
+
+            TroopData bomberData = EnsureTroopData(
+                "Bomber",
+                TroopType.Bomber,
+                "Bomber",
+                TroopTargeting.OnContact,
+                new Color(1f, 0.4784f, 0.2392f),
+                20f,
+                80f,
+                999f,
                 squareSprite);
 
             Troop troopPrefab = EnsureTroopPrefab(squareSprite);
@@ -51,7 +87,7 @@ namespace MergeAndMarch.Editor
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
             Camera camera = ConfigureSceneCamera();
-            BuildScene(gameConfig, troopPrefab, knightData, archerData, squareSprite, camera);
+            BuildScene(gameConfig, troopPrefab, knightData, archerData, mageData, healerData, bomberData, squareSprite, camera);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.SaveAssets();
@@ -115,11 +151,13 @@ namespace MergeAndMarch.Editor
             string assetName,
             TroopType troopType,
             string displayName,
+            TroopTargeting targeting,
             Color troopColor,
             float baseHp,
             float baseAttack,
             float attackInterval,
-            Sprite sprite)
+            Sprite sprite,
+            float supportPower = 0f)
         {
             string assetPath = $"{DataAssetPath}/{assetName}.asset";
             TroopData asset = AssetDatabase.LoadAssetAtPath<TroopData>(assetPath);
@@ -132,10 +170,12 @@ namespace MergeAndMarch.Editor
 
             asset.troopType = troopType;
             asset.displayName = displayName;
+            asset.targeting = targeting;
             asset.troopColor = troopColor;
             asset.baseHP = baseHp;
             asset.baseAttack = baseAttack;
             asset.attackInterval = attackInterval;
+            asset.supportPower = supportPower;
             asset.sprite = sprite;
 
             EditorUtility.SetDirty(asset);
@@ -192,6 +232,9 @@ namespace MergeAndMarch.Editor
             Troop troopPrefab,
             TroopData knightData,
             TroopData archerData,
+            TroopData mageData,
+            TroopData healerData,
+            TroopData bomberData,
             Sprite slotSprite,
             Camera camera)
         {
@@ -218,6 +261,9 @@ namespace MergeAndMarch.Editor
             SetSerializedReference(runManager, "troopPrefab", troopPrefab);
             SetSerializedReference(runManager, "knightData", knightData);
             SetSerializedReference(runManager, "archerData", archerData);
+            SetSerializedReference(runManager, "mageData", mageData);
+            SetSerializedReference(runManager, "healerData", healerData);
+            SetSerializedReference(runManager, "bomberData", bomberData);
             SetSerializedReference(runManager, "troopRoot", troopRoot.transform);
             SetSerializedBool(runManager, "spawnOnStart", false);
 

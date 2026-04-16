@@ -42,6 +42,9 @@ namespace MergeAndMarch.Data
         [Min(0.1f)] public float enemyFailOffset = 0.8f;
         [Min(0.05f)] public float enemyEngageDistance = 0.3f;
         [Min(0.1f)] public float knightMeleeReach = 1.35f;
+        [Min(0.1f)] public float mageBandHalfHeight = 0.55f;
+        [Min(0.1f)] public float bomberTriggerReach = 0.45f;
+        [Min(0.1f)] public float bomberExplosionRadius = 0.95f;
         [Min(0.1f)] public float enemySpawnIntervalMin = 0.3f;
         [Min(0.1f)] public float enemySpawnIntervalMax = 0.5f;
 

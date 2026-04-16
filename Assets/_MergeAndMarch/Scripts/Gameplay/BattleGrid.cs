@@ -252,6 +252,24 @@ namespace MergeAndMarch.Gameplay
             return false;
         }
 
+        public void ResetTroopsForWaveStart()
+        {
+            EnsureOccupantArray();
+
+            if (config == null || occupants == null)
+            {
+                return;
+            }
+
+            for (int column = 0; column < config.columns; column++)
+            {
+                for (int row = 0; row < config.rows; row++)
+                {
+                    occupants[column, row]?.ResetForWaveStart();
+                }
+            }
+        }
+
         public bool TryGetNearestSlot(Vector3 worldPosition, out int column, out int row)
         {
             column = -1;

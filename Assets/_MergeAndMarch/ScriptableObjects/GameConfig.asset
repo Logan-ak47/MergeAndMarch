@@ -16,13 +16,18 @@ MonoBehaviour:
   rows: 2
   cellSize: 1.15
   gridOffset: {x: -1.725, y: -3.6}
-  troopBaseScale: 3.6
-  tierTwoScale: 4.3
-  tierThreeScale: 5
+  troopBaseScale: 0.82
+  tierTwoScale: 0.97
+  tierThreeScale: 1.12
   slotVisualScale: 0.88
   slotTint: {r: 1, g: 1, b: 1, a: 0.14}
   tierTwoTint: {r: 1, g: 1, b: 1, a: 1}
   tierThreeTint: {r: 1, g: 0.95, b: 0.95, a: 1}
+  laneGuideHeight: 5.8
+  laneGuideWidthScale: 0.1
+  laneGuideMarkerScale: 0.16
+  laneGuideTint: {r: 1, g: 1, b: 1, a: 0.08}
+  laneGuideMarkerTint: {r: 1, g: 1, b: 1, a: 0.14}
   tacticalSlowTimeScale: 0.2
   mergeSlideDuration: 0.15
   mergeFlashDuration: 0.1
@@ -35,7 +40,13 @@ MonoBehaviour:
   enemyFailOffset: 0.8
   enemyEngageDistance: 0.3
   knightMeleeReach: 1.35
-  startingEnemyCount: 3
-  maxEnemiesPerWave: 8
+  mageBandHalfHeight: 0.55
+  bomberTriggerReach: 0.45
+  bomberExplosionRadius: 0.95
+  enemySpawnIntervalMin: 0.3
+  enemySpawnIntervalMax: 0.5
   startWaveDelay: 0.6
   timeBetweenWaves: 1.5
+  waveClearedBannerDuration: 1
+  cardPickPlaceholderDuration: 1
+  runEndRestartDelay: 2

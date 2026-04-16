@@ -250,7 +250,7 @@ namespace MergeAndMarch.Gameplay
             foreach (Collider2D hit in hits)
             {
                 Troop troop = hit.GetComponent<Troop>();
-                if (troop == null)
+                if (troop == null || !troop.IsInteractable)
                 {
                     continue;
                 }

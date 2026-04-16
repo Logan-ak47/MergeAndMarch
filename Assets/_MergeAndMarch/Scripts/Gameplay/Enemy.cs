@@ -74,6 +74,11 @@ namespace MergeAndMarch.Gameplay
                 return;
             }
 
+            if (TryTriggerBomberInRowZone())
+            {
+                return;
+            }
+
             Troop blockingTroop = FindBlockingTroop();
             if (blockingTroop == null)
             {
@@ -98,6 +103,31 @@ namespace MergeAndMarch.Gameplay
                 battleGrid.RemoveTroop(blockingTroop);
                 Destroy(blockingTroop.gameObject);
             }
+        }
+
+        private bool TryTriggerBomberInRowZone()
+        {
+            battleGrid.GetTroops(troopBuffer);
+            float rowZoneHalfHeight = gameConfig.cellSize * 0.5f;
+
+            for (int i = 0; i < troopBuffer.Count; i++)
+            {
+                Troop troop = troopBuffer[i];
+                if (troop == null || !troop.IsSingleUse || troop.HasExplodedThisWave)
+                {
+                    continue;
+                }
+
+                if (Mathf.Abs(transform.position.y - troop.transform.position.y) > rowZoneHalfHeight)
+                {
+                    continue;
+                }
+
+                troop.TriggerExplosion();
+                return !IsAlive;
+            }
+
+            return false;
         }
 
         public void Initialize(
@@ -204,7 +234,7 @@ namespace MergeAndMarch.Gameplay
             for (int i = 0; i < troopBuffer.Count; i++)
             {
                 Troop troop = troopBuffer[i];
-                if (troop == null || !troop.IsAlive || troop.Column != LaneColumn)
+                if (troop == null || !troop.IsCombatActive || troop.Column != LaneColumn)
                 {
                     continue;
                 }

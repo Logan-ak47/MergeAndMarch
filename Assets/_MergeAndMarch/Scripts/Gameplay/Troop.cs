@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using MergeAndMarch.Data;
 using System.Collections;
 using UnityEngine;
@@ -8,6 +9,8 @@ namespace MergeAndMarch.Gameplay
     [RequireComponent(typeof(BoxCollider2D))]
     public class Troop : MonoBehaviour
     {
+        private static Sprite runtimeCircleSprite;
+
         [SerializeField] private SpriteRenderer spriteRenderer;
         [SerializeField] private BoxCollider2D boxCollider;
 
@@ -20,6 +23,10 @@ namespace MergeAndMarch.Gameplay
         public float CurrentHP => currentHP;
         public float MaxHP => Data == null ? 0f : Data.baseHP * GetTierStatMultiplier() * GetHpMultiplier();
         public bool IsAlive => currentHP > 0.01f;
+        public bool IsCombatActive => IsAlive && !hasExplodedThisWave;
+        public bool IsInteractable => IsAlive && !hasExplodedThisWave;
+        public bool IsSingleUse => Data != null && Data.troopType == TroopType.Bomber;
+        public bool HasExplodedThisWave => hasExplodedThisWave;
 
         private Color baseColor;
         private int defaultSortingOrder;
@@ -31,7 +38,9 @@ namespace MergeAndMarch.Gameplay
         private BattleGrid assignedBattleGrid;
         private Coroutine flashRoutine;
         private Coroutine attackMotionRoutine;
+        private Coroutine bomberFadeRoutine;
         private bool isDragging;
+        private bool hasExplodedThisWave;
 
         private void Reset()
         {
@@ -60,6 +69,7 @@ namespace MergeAndMarch.Gameplay
             baseColor = troopData.troopColor;
             currentConfig = config;
             visualSizeBoost = 1f;
+            hasExplodedThisWave = false;
 
             name = $"{troopData.displayName}_{column}_{row}";
 
@@ -75,6 +85,7 @@ namespace MergeAndMarch.Gameplay
             ApplyTierVisuals(config);
             ConfigureCollider();
             currentHP = MaxHP;
+            SetBomberState(false);
         }
 
         public void SetGridPosition(Vector3 worldPosition, int column, int row)
@@ -102,7 +113,15 @@ namespace MergeAndMarch.Gameplay
 
         public bool CanMergeWith(Troop other)
         {
-            return other != null && other != this && Data != null && other.Data != null && Data.troopType == other.Data.troopType && Tier == other.Tier && Tier < 3;
+            return other != null
+                && other != this
+                && Data != null
+                && other.Data != null
+                && IsInteractable
+                && other.IsInteractable
+                && Data.troopType == other.Data.troopType
+                && Tier == other.Tier
+                && Tier < 3;
         }
 
         public void SetDragging(bool isDraggingNow)
@@ -153,6 +172,11 @@ namespace MergeAndMarch.Gameplay
             return Data == null ? 0f : Data.baseAttack * GetTierStatMultiplier();
         }
 
+        public float GetSupportPower()
+        {
+            return Data == null ? 0f : Data.supportPower * GetTierStatMultiplier();
+        }
+
         public float GetAttackInterval()
         {
             return Data == null ? 1f : Data.attackInterval * GetAttackIntervalMultiplier();
@@ -187,6 +211,7 @@ namespace MergeAndMarch.Gameplay
             }
 
             currentHP = Mathf.Clamp(currentHP + Mathf.Max(0f, amount), 0f, MaxHP);
+            StartFlash(Color.Lerp(baseColor, Color.white, 0.55f), 0.12f);
         }
 
         public void PlayAttackFeedback(Vector3 targetWorldPosition)
@@ -208,7 +233,7 @@ namespace MergeAndMarch.Gameplay
 
         public bool ApplyDamage(float damage)
         {
-            if (!IsAlive)
+            if (!IsCombatActive)
             {
                 return true;
             }
@@ -216,6 +241,96 @@ namespace MergeAndMarch.Gameplay
             currentHP = Mathf.Max(0f, currentHP - Mathf.Max(0f, damage));
             StartFlash(Color.white, 0.1f);
             return !IsAlive;
+        }
+
+        public void ResetForWaveStart()
+        {
+            RespawnBomber();
+        }
+
+        public void RespawnBomber()
+        {
+            if (!IsSingleUse)
+            {
+                return;
+            }
+
+            if (bomberFadeRoutine != null)
+            {
+                StopCoroutine(bomberFadeRoutine);
+                bomberFadeRoutine = null;
+            }
+
+            SetBomberState(false);
+        }
+
+        public void ConsumeBomber()
+        {
+            if (!IsSingleUse || hasExplodedThisWave)
+            {
+                return;
+            }
+
+            if (bomberFadeRoutine != null)
+            {
+                StopCoroutine(bomberFadeRoutine);
+            }
+
+            bomberFadeRoutine = StartCoroutine(FadeBomberOutRoutine());
+        }
+
+        public bool TriggerExplosion()
+        {
+            if (!IsSingleUse || hasExplodedThisWave || !IsAlive)
+            {
+                return false;
+            }
+
+            float damage = GetAttackDamage();
+            RunBuffs buffs = CardSystem.Instance != null ? CardSystem.Instance.runBuffs : null;
+            if (buffs != null)
+            {
+                damage *= buffs.attackMultiplier;
+                damage *= buffs.bomberAttackMultiplier;
+            }
+
+            float radius = GetBomberExplosionRadius();
+            IReadOnlyList<Enemy> enemies = Enemy.ActiveEnemies;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                Enemy enemy = enemies[i];
+                if (enemy == null || !enemy.IsAlive)
+                {
+                    continue;
+                }
+
+                if (Vector2.Distance(transform.position, enemy.transform.position) <= radius)
+                {
+                    enemy.ApplyDamage(damage);
+                }
+            }
+
+            StartCoroutine(PlayBomberExplosionRoutine(radius));
+            ConsumeBomber();
+            return true;
+        }
+
+        public float GetBomberExplosionRadius()
+        {
+            float radius = Tier switch
+            {
+                2 => 2.5f,
+                3 => 3f,
+                _ => 2f
+            };
+
+            RunBuffs buffs = CardSystem.Instance != null ? CardSystem.Instance.runBuffs : null;
+            if (buffs != null)
+            {
+                radius *= buffs.bomberRadiusMultiplier;
+            }
+
+            return radius;
         }
 
         private void ApplyTierVisuals(GameConfig config)
@@ -312,6 +427,21 @@ namespace MergeAndMarch.Gameplay
                     firstDuration = 0.05f;
                     secondDuration = 0.1f;
                     break;
+                case TroopType.Mage:
+                    firstTarget = start + new Vector3(0f, 0.1f, 0f);
+                    firstDuration = 0.06f;
+                    secondDuration = 0.1f;
+                    break;
+                case TroopType.Healer:
+                    firstTarget = start + (direction * 0.06f);
+                    firstDuration = 0.05f;
+                    secondDuration = 0.09f;
+                    break;
+                case TroopType.Bomber:
+                    firstTarget = start + (direction * 0.2f);
+                    firstDuration = 0.06f;
+                    secondDuration = 0.04f;
+                    break;
                 default:
                     firstTarget = start + (direction * 0.08f);
                     firstDuration = 0.05f;
@@ -358,6 +488,122 @@ namespace MergeAndMarch.Gameplay
         private float GetHpMultiplier()
         {
             return CardSystem.Instance != null ? CardSystem.Instance.runBuffs.hpMultiplier : 1f;
+        }
+
+        private void SetBomberState(bool exploded)
+        {
+            hasExplodedThisWave = exploded;
+
+            if (spriteRenderer != null)
+            {
+                Color color = spriteRenderer.color;
+                color.a = exploded ? 0.08f : 1f;
+                spriteRenderer.color = color;
+            }
+
+            if (boxCollider != null)
+            {
+                boxCollider.enabled = !exploded;
+            }
+        }
+
+        private IEnumerator FadeBomberOutRoutine()
+        {
+            SetDragging(false);
+
+            float duration = 0.18f;
+            float elapsed = 0f;
+            Color startColor = spriteRenderer.color;
+            hasExplodedThisWave = true;
+
+            if (boxCollider != null)
+            {
+                boxCollider.enabled = false;
+            }
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                float alpha = Mathf.Lerp(startColor.a, 0.08f, t);
+                spriteRenderer.color = new Color(startColor.r, startColor.g, startColor.b, alpha);
+                yield return null;
+            }
+
+            spriteRenderer.color = new Color(startColor.r, startColor.g, startColor.b, 0.08f);
+            bomberFadeRoutine = null;
+        }
+
+        private IEnumerator PlayBomberExplosionRoutine(float radius)
+        {
+            GameObject flash = new("BomberFlash");
+            flash.transform.position = transform.position;
+            SpriteRenderer flashRenderer = CreateEffectSprite(flash.transform, GetRuntimeCircleSprite(), Color.white, 7);
+            flash.transform.localScale = Vector3.one * 0.2f;
+
+            GameObject explosion = new("BomberExplosion");
+            explosion.transform.position = transform.position;
+            SpriteRenderer explosionRenderer = CreateEffectSprite(explosion.transform, GetRuntimeCircleSprite(), baseColor, 6);
+            explosion.transform.localScale = Vector3.zero;
+
+            float elapsed = 0f;
+            float duration = 0.2f;
+            Vector3 fullScale = Vector3.one * radius * 2f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                flash.transform.localScale = Vector3.Lerp(Vector3.one * 0.2f, Vector3.one * radius * 1.2f, t);
+                explosion.transform.localScale = Vector3.Lerp(Vector3.zero, fullScale, t);
+                flashRenderer.color = new Color(1f, 1f, 1f, Mathf.Lerp(0.95f, 0f, t));
+                explosionRenderer.color = new Color(baseColor.r, baseColor.g, baseColor.b, Mathf.Lerp(0.85f, 0f, t));
+                yield return null;
+            }
+
+            Destroy(flash);
+            Destroy(explosion);
+        }
+
+        private SpriteRenderer CreateEffectSprite(Transform parent, Sprite sprite, Color color, int sortingOrder)
+        {
+            GameObject effectObject = new("Effect");
+            effectObject.transform.SetParent(parent, false);
+            SpriteRenderer renderer = effectObject.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.color = color;
+            renderer.sortingLayerName = "Effects";
+            renderer.sortingOrder = sortingOrder;
+            return renderer;
+        }
+
+        private static Sprite GetRuntimeCircleSprite()
+        {
+            if (runtimeCircleSprite != null)
+            {
+                return runtimeCircleSprite;
+            }
+
+            const int size = 64;
+            Texture2D texture = new(size, size, TextureFormat.RGBA32, false);
+            Color[] pixels = new Color[size * size];
+            Vector2 center = new((size - 1) * 0.5f, (size - 1) * 0.5f);
+            float radius = size * 0.45f;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float distance = Vector2.Distance(new Vector2(x, y), center);
+                    float alpha = distance <= radius ? 1f - Mathf.Clamp01((distance / radius) * 0.4f) : 0f;
+                    pixels[(y * size) + x] = new Color(1f, 1f, 1f, alpha);
+                }
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply();
+            runtimeCircleSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+            runtimeCircleSprite.name = "TroopRuntimeCircle";
+            return runtimeCircleSprite;
         }
 
         private void CacheComponents()

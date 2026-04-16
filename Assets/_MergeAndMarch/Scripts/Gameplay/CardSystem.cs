@@ -107,6 +107,16 @@ namespace MergeAndMarch.Gameplay
                 case CardEffectType.AttackBoostArchers:
                     runBuffs.archerAttackMultiplier += card.effectValue;
                     break;
+                case CardEffectType.AttackBoostMages:
+                    runBuffs.mageAttackMultiplier += card.effectValue;
+                    break;
+                case CardEffectType.HealBoostHealers:
+                case CardEffectType.HealerBoost:
+                    runBuffs.healerPowerMultiplier += card.effectValue;
+                    break;
+                case CardEffectType.AttackBoostBombers:
+                    runBuffs.bomberAttackMultiplier += card.effectValue;
+                    break;
                 case CardEffectType.SpawnRandomTroop:
                     deploymentSystem?.SpawnTroopInEmptySlot(null);
                     break;
@@ -115,6 +125,18 @@ namespace MergeAndMarch.Gameplay
                     break;
                 case CardEffectType.SpawnArcher:
                     deploymentSystem?.SpawnTroopInEmptySlot(TroopType.Archer);
+                    break;
+                case CardEffectType.SpawnMage:
+                    deploymentSystem?.SpawnTroopInEmptySlot(TroopType.Mage);
+                    break;
+                case CardEffectType.SpawnHealer:
+                    deploymentSystem?.SpawnTroopInEmptySlot(TroopType.Healer);
+                    break;
+                case CardEffectType.SpawnBomber:
+                    deploymentSystem?.SpawnTroopInEmptySlot(TroopType.Bomber);
+                    break;
+                case CardEffectType.BomberRadius:
+                    runBuffs.bomberRadiusMultiplier += card.effectValue;
                     break;
                 case CardEffectType.MergeBoostNextTier:
                     runBuffs.nextMergeBoosted = true;

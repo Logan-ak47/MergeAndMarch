@@ -11,6 +11,8 @@ namespace MergeAndMarch.Data
         [Min(1f)] public float baseHP = 50f;
         [Min(0f)] public float baseAttack = 10f;
         [Min(0.05f)] public float attackInterval = 1f;
+        public TroopTargeting targeting = TroopTargeting.Melee;
+        [Min(0f)] public float supportPower = 0f;
         public Sprite sprite;
     }
 }

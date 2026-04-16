@@ -16,6 +16,14 @@ namespace MergeAndMarch.Data
         KnightThorns,
         DoubleCoins,
         ExtraDeploy,
-        MergeHeal
+        MergeHeal,
+        AttackBoostMages,
+        HealBoostHealers,
+        AttackBoostBombers,
+        SpawnMage,
+        SpawnHealer,
+        SpawnBomber,
+        HealerBoost,
+        BomberRadius
     }
 }

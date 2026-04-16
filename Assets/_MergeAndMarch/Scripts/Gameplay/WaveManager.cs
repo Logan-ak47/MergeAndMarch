@@ -107,6 +107,7 @@ namespace MergeAndMarch.Gameplay
             }
 
             cardSystem?.ResetRunBuffs();
+            battleGrid?.ResetTroopsForWaveStart();
             autoCombat?.SetCombatEnabled(true);
             autoCombat?.ResetAttackTimers();
             currentWave = 0;
@@ -139,6 +140,7 @@ namespace MergeAndMarch.Gameplay
                     }
 
                     State = WaveState.Deploying;
+                    battleGrid?.ResetTroopsForWaveStart();
                     deploymentSystem?.DeployTroopsForNextWave();
                     autoCombat?.ResetAttackTimers();
                 }

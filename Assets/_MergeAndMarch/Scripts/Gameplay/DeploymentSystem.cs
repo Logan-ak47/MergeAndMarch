@@ -12,12 +12,16 @@ namespace MergeAndMarch.Gameplay
     public class DeploymentSystem : MonoBehaviour
     {
         private readonly List<Vector2Int> emptySlots = new();
+        private readonly List<TroopData> weightedPool = new();
 
         [SerializeField] private GameConfig gameConfig;
         [SerializeField] private BattleGrid battleGrid;
         [SerializeField] private Troop troopPrefab;
         [SerializeField] private TroopData knightData;
         [SerializeField] private TroopData archerData;
+        [SerializeField] private TroopData mageData;
+        [SerializeField] private TroopData healerData;
+        [SerializeField] private TroopData bomberData;
         [SerializeField] private Transform troopRoot;
 
         public int DeployTroopsForNextWave()
@@ -52,7 +56,7 @@ namespace MergeAndMarch.Gameplay
         public bool SpawnTroopInEmptySlot(TroopType? forcedType, bool animate = true)
         {
             ResolveReferences();
-            if (battleGrid == null || troopPrefab == null || gameConfig == null || knightData == null || archerData == null)
+            if (battleGrid == null || troopPrefab == null || gameConfig == null)
             {
                 Debug.LogWarning("DeploymentSystem is missing one or more references.", this);
                 return false;
@@ -90,17 +94,26 @@ namespace MergeAndMarch.Gameplay
 
         private TroopData GetTroopData(TroopType? forcedType)
         {
-            if (!forcedType.HasValue)
+            if (forcedType.HasValue)
             {
-                return Random.value < 0.5f ? knightData : archerData;
+                return forcedType.Value switch
+                {
+                    TroopType.Knight => knightData,
+                    TroopType.Archer => archerData,
+                    TroopType.Mage => mageData,
+                    TroopType.Healer => healerData,
+                    TroopType.Bomber => bomberData,
+                    _ => null
+                };
             }
 
-            return forcedType.Value switch
+            BuildWeightedTroopPool(weightedPool);
+            if (weightedPool.Count == 0)
             {
-                TroopType.Knight => knightData,
-                TroopType.Archer => archerData,
-                _ => Random.value < 0.5f ? knightData : archerData
-            };
+                return null;
+            }
+
+            return weightedPool[Random.Range(0, weightedPool.Count)];
         }
 
         private IEnumerator PlayDeployPopIn(Troop troop)
@@ -163,6 +176,21 @@ namespace MergeAndMarch.Gameplay
                 archerData = runManager.ArcherData;
             }
 
+            if (mageData == null && runManager != null)
+            {
+                mageData = runManager.MageData;
+            }
+
+            if (healerData == null && runManager != null)
+            {
+                healerData = runManager.HealerData;
+            }
+
+            if (bomberData == null && runManager != null)
+            {
+                bomberData = runManager.BomberData;
+            }
+
             if (troopRoot == null && runManager != null)
             {
                 troopRoot = runManager.TroopRoot;
@@ -183,7 +211,63 @@ namespace MergeAndMarch.Gameplay
             {
                 archerData = AssetDatabase.LoadAssetAtPath<TroopData>("Assets/_MergeAndMarch/ScriptableObjects/Archer.asset");
             }
+
+            if (mageData == null)
+            {
+                mageData = AssetDatabase.LoadAssetAtPath<TroopData>("Assets/_MergeAndMarch/ScriptableObjects/Mage.asset");
+            }
+
+            if (healerData == null)
+            {
+                healerData = AssetDatabase.LoadAssetAtPath<TroopData>("Assets/_MergeAndMarch/ScriptableObjects/Healer.asset");
+            }
+
+            if (bomberData == null)
+            {
+                bomberData = AssetDatabase.LoadAssetAtPath<TroopData>("Assets/_MergeAndMarch/ScriptableObjects/Bomber.asset");
+            }
 #endif
+        }
+
+        private void BuildWeightedTroopPool(List<TroopData> pool)
+        {
+            pool.Clear();
+
+            if (knightData != null)
+            {
+                pool.Add(knightData);
+            }
+
+            if (archerData != null)
+            {
+                pool.Add(archerData);
+            }
+
+            if (mageData != null)
+            {
+                pool.Add(mageData);
+            }
+
+            if (healerData != null)
+            {
+                pool.Add(healerData);
+            }
+
+            RunManager runManager = FindFirstObjectByType<RunManager>();
+            if (runManager == null)
+            {
+                return;
+            }
+
+            IReadOnlyList<TroopType> startingComposition = runManager.GetStartingLineupComposition();
+            for (int i = 0; i < startingComposition.Count; i++)
+            {
+                TroopData weightedData = GetTroopData(startingComposition[i]);
+                if (weightedData != null && weightedData.troopType != TroopType.Bomber)
+                {
+                    pool.Add(weightedData);
+                }
+            }
         }
     }
 }
