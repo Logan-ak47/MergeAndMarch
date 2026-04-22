@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using MergeAndMarch.Data;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace MergeAndMarch.Gameplay
 {
@@ -10,9 +11,16 @@ namespace MergeAndMarch.Gameplay
     public class Troop : MonoBehaviour
     {
         private static Sprite runtimeCircleSprite;
+        private static readonly Color HpBarGreen = new(0.2667f, 1f, 0.5333f, 1f);
+        private static readonly Color HpBarYellow = new(1f, 0.8667f, 0.2667f, 1f);
+        private static readonly Color HpBarRed = new(1f, 0.2667f, 0.2667f, 1f);
 
         [SerializeField] private SpriteRenderer spriteRenderer;
         [SerializeField] private BoxCollider2D boxCollider;
+        [SerializeField] private SpriteRenderer tierGlowRenderer;
+        [SerializeField] private SpriteRenderer mergeHighlightRenderer;
+        [SerializeField] private GameObject hpBarRoot;
+        [SerializeField] private Image hpBarFillImage;
 
         public TroopData Data { get; private set; }
         public int Tier { get; private set; } = 1;
@@ -41,10 +49,16 @@ namespace MergeAndMarch.Gameplay
         private Coroutine bomberFadeRoutine;
         private bool isDragging;
         private bool hasExplodedThisWave;
+        private bool isHighlighted;
+        private bool isDimmed;
+        private Vector3 mergeHighlightBaseScale = Vector3.one;
+        private Vector3 baseScale = Vector3.one;
+        private float tierPulseScale = 1f;
 
         private void Reset()
         {
             CacheComponents();
+            ResolveReadabilityReferences();
             ConfigureCollider();
         }
 
@@ -52,7 +66,19 @@ namespace MergeAndMarch.Gameplay
         {
             CacheComponents();
             CaptureBaseSpriteSize();
+            ResolveReadabilityReferences();
             ConfigureCollider();
+            if (mergeHighlightRenderer != null)
+            {
+                mergeHighlightBaseScale = mergeHighlightRenderer.transform.localScale;
+                mergeHighlightRenderer.gameObject.SetActive(false);
+            }
+        }
+
+        private void LateUpdate()
+        {
+            UpdateTierPulse();
+            UpdateHighlightPulse();
         }
 
         private void OnDestroy()
@@ -82,10 +108,12 @@ namespace MergeAndMarch.Gameplay
             spriteRenderer.color = baseColor;
             spriteRenderer.drawMode = SpriteDrawMode.Simple;
             defaultSortingOrder = spriteRenderer.sortingOrder;
+            ResolveReadabilityReferences();
             ApplyTierVisuals(config);
             ConfigureCollider();
             currentHP = MaxHP;
             SetBomberState(false);
+            UpdateHPBar();
         }
 
         public void SetGridPosition(Vector3 worldPosition, int column, int row)
@@ -102,13 +130,13 @@ namespace MergeAndMarch.Gameplay
 
         public void UpgradeTier(GameConfig config)
         {
-            float oldMaxHp = MaxHP;
             currentConfig = config;
             Tier = Mathf.Clamp(Tier + 1, 1, 3);
             visualSizeBoost = 1f;
             ApplyTierVisuals(config);
             ConfigureCollider();
-            RefreshCurrentHpForMaxHpChange(oldMaxHp, true);
+            currentHP = MaxHP;
+            UpdateHPBar();
         }
 
         public bool CanMergeWith(Troop other)
@@ -133,6 +161,7 @@ namespace MergeAndMarch.Gameplay
             }
 
             spriteRenderer.sortingOrder = isDraggingNow ? 20 : defaultSortingOrder;
+            UpdateReadabilitySorting();
         }
 
         public void SetVisualSizeBoost(float boost)
@@ -145,6 +174,32 @@ namespace MergeAndMarch.Gameplay
         {
             visualSizeBoost = 1f;
             RefreshVisualSize();
+        }
+
+        public void SetMergeHighlight(bool on)
+        {
+            isHighlighted = on;
+            if (mergeHighlightRenderer != null)
+            {
+                mergeHighlightRenderer.gameObject.SetActive(on);
+                if (!on)
+                {
+                    mergeHighlightRenderer.transform.localScale = mergeHighlightBaseScale;
+                }
+            }
+        }
+
+        public void SetDimmed(bool on)
+        {
+            isDimmed = on;
+            if (spriteRenderer == null)
+            {
+                return;
+            }
+
+            Color c = spriteRenderer.color;
+            c.a = on ? 0.45f : 1f;
+            spriteRenderer.color = c;
         }
 
         public float GetTierStatMultiplier()
@@ -191,6 +246,7 @@ namespace MergeAndMarch.Gameplay
             }
 
             currentHP = Mathf.Clamp(currentHP, 0f, newMaxHp);
+            UpdateHPBar();
         }
 
         public void HealPercent(float percent)
@@ -212,6 +268,7 @@ namespace MergeAndMarch.Gameplay
 
             currentHP = Mathf.Clamp(currentHP + Mathf.Max(0f, amount), 0f, MaxHP);
             StartFlash(Color.Lerp(baseColor, Color.white, 0.55f), 0.12f);
+            UpdateHPBar();
         }
 
         public void PlayAttackFeedback(Vector3 targetWorldPosition)
@@ -240,6 +297,7 @@ namespace MergeAndMarch.Gameplay
 
             currentHP = Mathf.Max(0f, currentHP - Mathf.Max(0f, damage));
             StartFlash(Color.white, 0.1f);
+            UpdateHPBar();
             return !IsAlive;
         }
 
@@ -354,6 +412,21 @@ namespace MergeAndMarch.Gameplay
                 tint = Color.Lerp(baseColor, config.tierThreeTint, 0.4f);
             }
             spriteRenderer.color = tint;
+            if (mergeHighlightRenderer != null)
+            {
+                mergeHighlightRenderer.sprite = spriteRenderer.sprite;
+            }
+
+            if (tierGlowRenderer != null)
+            {
+                tierGlowRenderer.sprite = spriteRenderer.sprite;
+                tierGlowRenderer.enabled = Tier >= 2;
+                tierGlowRenderer.color = Tier == 3
+                    ? new Color(1f, 0.92f, 0.66f, 0.9f)
+                    : new Color(1f, 1f, 1f, 0.6f);
+                tierGlowRenderer.transform.localScale = Tier == 3 ? Vector3.one * 1.18f : Vector3.one * 1.1f;
+                tierGlowRenderer.transform.localPosition = new Vector3(0f, 0f, 0.05f);
+            }
             RefreshVisualSize();
         }
 
@@ -364,7 +437,8 @@ namespace MergeAndMarch.Gameplay
                 return;
             }
 
-            transform.localScale = Vector3.one * currentSizeMultiplier * visualSizeBoost;
+            baseScale = Vector3.one * currentSizeMultiplier * visualSizeBoost;
+            ApplyCurrentScale();
             ConfigureCollider();
         }
 
@@ -501,10 +575,17 @@ namespace MergeAndMarch.Gameplay
                 spriteRenderer.color = color;
             }
 
+            if (tierGlowRenderer != null)
+            {
+                tierGlowRenderer.enabled = !exploded && Tier >= 2;
+            }
+
             if (boxCollider != null)
             {
                 boxCollider.enabled = !exploded;
             }
+
+            UpdateHPBar();
         }
 
         private IEnumerator FadeBomberOutRoutine()
@@ -643,5 +724,122 @@ namespace MergeAndMarch.Gameplay
             boxCollider.offset = Vector2.zero;
             boxCollider.size = baseSpriteSize * currentSizeMultiplier * visualSizeBoost * 0.85f;
         }
+
+        private void ResolveReadabilityReferences()
+        {
+            if (mergeHighlightRenderer == null)
+            {
+                mergeHighlightRenderer = transform.Find("MergeHighlight")?.GetComponent<SpriteRenderer>();
+            }
+
+            if (tierGlowRenderer == null)
+            {
+                tierGlowRenderer = transform.Find("TierGlow")?.GetComponent<SpriteRenderer>();
+            }
+
+            if (tierGlowRenderer != null)
+            {
+                tierGlowRenderer.sortingLayerName = spriteRenderer != null ? spriteRenderer.sortingLayerName : "Troops";
+                tierGlowRenderer.enabled = false;
+            }
+
+            if (hpBarRoot == null)
+            {
+                hpBarRoot = transform.Find("HPBarRoot")?.gameObject;
+            }
+
+            if (hpBarFillImage == null && hpBarRoot != null)
+            {
+                hpBarFillImage = hpBarRoot.transform.Find("Fill")?.GetComponent<Image>();
+            }
+
+            UpdateReadabilitySorting();
+        }
+
+        private void UpdateHPBar()
+        {
+            if (hpBarRoot == null || hpBarFillImage == null)
+            {
+                ResolveReadabilityReferences();
+            }
+
+            if (hpBarRoot == null || hpBarFillImage == null)
+            {
+                return;
+            }
+
+            if (MaxHP <= 0.01f)
+            {
+                hpBarRoot.SetActive(false);
+                hpBarFillImage.fillAmount = 0f;
+                return;
+            }
+
+            float ratio = Mathf.Clamp01(currentHP / MaxHP);
+            hpBarFillImage.fillAmount = ratio;
+            hpBarFillImage.color = ratio > 0.5f ? HpBarGreen : ratio > 0.25f ? HpBarYellow : HpBarRed;
+
+            bool shouldShow = !hasExplodedThisWave && currentHP > 0.01f && ratio < 0.999f;
+            hpBarRoot.SetActive(shouldShow);
+        }
+
+        private void UpdateHighlightPulse()
+        {
+            if (!isHighlighted || mergeHighlightRenderer == null)
+            {
+                return;
+            }
+
+            float pulse = 1f + (Mathf.Sin(Time.unscaledTime * 4f) * 0.08f);
+            mergeHighlightRenderer.transform.localScale = mergeHighlightBaseScale * pulse;
+        }
+
+        private void UpdateTierPulse()
+        {
+            float targetPulse = Tier == 3 ? 1f + (Mathf.Sin(Time.unscaledTime * 2f) * 0.05f) : 1f;
+            if (Mathf.Abs(targetPulse - tierPulseScale) < 0.0001f)
+            {
+                return;
+            }
+
+            tierPulseScale = targetPulse;
+            ApplyCurrentScale();
+        }
+
+        private void ApplyCurrentScale()
+        {
+            transform.localScale = baseScale * tierPulseScale;
+        }
+
+        private void UpdateReadabilitySorting()
+        {
+            if (spriteRenderer == null)
+            {
+                return;
+            }
+
+            if (mergeHighlightRenderer != null)
+            {
+                mergeHighlightRenderer.sortingLayerName = spriteRenderer.sortingLayerName;
+                mergeHighlightRenderer.sortingOrder = spriteRenderer.sortingOrder - 2;
+            }
+
+            if (tierGlowRenderer != null)
+            {
+                tierGlowRenderer.sortingLayerName = spriteRenderer.sortingLayerName;
+                tierGlowRenderer.sortingOrder = spriteRenderer.sortingOrder - 1;
+            }
+
+            if (hpBarRoot != null)
+            {
+                Canvas canvas = hpBarRoot.GetComponent<Canvas>();
+                if (canvas != null)
+                {
+                    canvas.sortingLayerName = spriteRenderer.sortingLayerName;
+                    canvas.sortingOrder = spriteRenderer.sortingOrder + 2;
+                }
+            }
+        }
+
     }
 }

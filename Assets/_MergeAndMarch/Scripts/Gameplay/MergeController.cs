@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using MergeAndMarch.Core;
 using MergeAndMarch.Data;
 using UnityEngine;
@@ -11,11 +12,15 @@ namespace MergeAndMarch.Gameplay
         [SerializeField] private GameConfig gameConfig;
         [SerializeField] private BattleGrid battleGrid;
         [SerializeField] private Camera targetCamera;
+        [SerializeField] private WaveManager waveManager;
 
         private Troop draggedTroop;
         private Vector3 dragOffset;
         private Vector3 originalWorldPosition;
         private bool isResolving;
+        private readonly List<Troop> troopScanBuffer = new();
+        private readonly List<Troop> highlightedTroops = new();
+        private readonly List<Troop> dimmedTroops = new();
 
         private void Awake()
         {
@@ -62,6 +67,23 @@ namespace MergeAndMarch.Gameplay
             }
         }
 
+        public bool TrySimulateMerge(Troop source, Troop target)
+        {
+            if (isResolving || draggedTroop != null || source == null || target == null)
+            {
+                return false;
+            }
+
+            if (!source.CanMergeWith(target))
+            {
+                return false;
+            }
+
+            ClearAllHighlights();
+            StartCoroutine(ResolveMerge(source, target));
+            return true;
+        }
+
         private void BeginDrag(Vector3 worldPosition)
         {
             Troop troop = GetTroopUnderPoint(worldPosition);
@@ -79,6 +101,8 @@ namespace MergeAndMarch.Gameplay
             {
                 TimeScaleManager.Instance.SetGameplaySlowMo(gameConfig.tacticalSlowTimeScale);
             }
+
+            HighlightMergeTargets(draggedTroop);
         }
 
         private void UpdateDrag(Vector3 worldPosition)
@@ -98,6 +122,7 @@ namespace MergeAndMarch.Gameplay
                 return;
             }
 
+            ClearAllHighlights();
             draggedTroop.SetDragging(false);
 
             if (!battleGrid.TryGetNearestSlot(worldPosition, out int targetColumn, out int targetRow))
@@ -196,6 +221,8 @@ namespace MergeAndMarch.Gameplay
                 target.UpgradeTier(gameConfig);
             }
 
+            ResolveWaveManager();
+            waveManager?.RegisterMerge();
             target.SetVisualSizeBoost(gameConfig.mergeOvershootScale);
             yield return AnimateVisualSizeBoost(target, 1f, gameConfig.mergePopDuration);
             ApplyMergeHeal(target);
@@ -396,6 +423,65 @@ namespace MergeAndMarch.Gameplay
             {
                 elapsed += Time.unscaledDeltaTime;
                 yield return null;
+            }
+        }
+
+        private void HighlightMergeTargets(Troop dragged)
+        {
+            if (battleGrid == null || dragged == null)
+            {
+                return;
+            }
+
+            battleGrid.GetTroops(troopScanBuffer);
+            for (int i = 0; i < troopScanBuffer.Count; i++)
+            {
+                Troop troop = troopScanBuffer[i];
+                if (troop == null || troop == dragged || !troop.IsInteractable)
+                {
+                    continue;
+                }
+
+                if (troop.CanMergeWith(dragged))
+                {
+                    troop.SetMergeHighlight(true);
+                    highlightedTroops.Add(troop);
+                }
+                else
+                {
+                    troop.SetDimmed(true);
+                    dimmedTroops.Add(troop);
+                }
+            }
+        }
+
+        private void ClearAllHighlights()
+        {
+            for (int i = 0; i < highlightedTroops.Count; i++)
+            {
+                if (highlightedTroops[i] != null)
+                {
+                    highlightedTroops[i].SetMergeHighlight(false);
+                }
+            }
+
+            for (int i = 0; i < dimmedTroops.Count; i++)
+            {
+                if (dimmedTroops[i] != null)
+                {
+                    dimmedTroops[i].SetDimmed(false);
+                }
+            }
+
+            highlightedTroops.Clear();
+            dimmedTroops.Clear();
+        }
+
+        private void ResolveWaveManager()
+        {
+            if (waveManager == null)
+            {
+                waveManager = FindFirstObjectByType<WaveManager>();
             }
         }
     }

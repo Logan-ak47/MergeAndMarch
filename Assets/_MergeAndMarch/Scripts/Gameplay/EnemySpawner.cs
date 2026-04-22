@@ -17,6 +17,9 @@ namespace MergeAndMarch.Gameplay
         [SerializeField] private BattleGrid battleGrid;
         [SerializeField] private Enemy enemyPrefab;
         [SerializeField] private EnemyData gruntData;
+        [SerializeField] private EnemyData rusherData;
+        [SerializeField] private EnemyData tankData;
+        [SerializeField] private EnemyData flyerData;
         [SerializeField] private Transform enemyRoot;
 
         private Coroutine spawnRoutine;
@@ -115,16 +118,23 @@ namespace MergeAndMarch.Gameplay
             Bounds gridBounds = battleGrid.GetGridWorldBounds();
             float spawnY = gridBounds.max.y + gameConfig.enemySpawnYOffset;
             float failY = gridBounds.min.y - gameConfig.enemyFailOffset;
-            int enemiesThisWave = GetEnemyCountForWave(waveNumber);
             Transform parent = enemyRoot != null ? enemyRoot : transform;
 
-            for (int i = 0; i < enemiesThisWave; i++)
+            if (waveNumber == 16)
             {
-                SpawnEnemyForWave(waveNumber, spawnY, failY, parent);
-                if (i < enemiesThisWave - 1)
+                SpawnEnemy(gruntData, waveNumber, spawnY, failY, parent);
+            }
+            else
+            {
+                List<EnemyData> waveEnemies = GetWaveEnemies(waveNumber);
+                for (int i = 0; i < waveEnemies.Count; i++)
                 {
-                    float delay = UnityEngine.Random.Range(gameConfig.enemySpawnIntervalMin, gameConfig.enemySpawnIntervalMax);
-                    yield return new WaitForSecondsRealtime(delay);
+                    SpawnEnemy(waveEnemies[i], waveNumber, spawnY, failY, parent);
+                    if (i < waveEnemies.Count - 1)
+                    {
+                        float delay = UnityEngine.Random.Range(gameConfig.enemySpawnIntervalMin, gameConfig.enemySpawnIntervalMax);
+                        yield return new WaitForSecondsRealtime(delay);
+                    }
                 }
             }
 
@@ -133,32 +143,136 @@ namespace MergeAndMarch.Gameplay
             EvaluateWaveCleared();
         }
 
-        private void SpawnEnemyForWave(int waveNumber, float spawnY, float failY, Transform parent)
+        private void SpawnEnemy(EnemyData data, int waveNumber, float spawnY, float failY, Transform parent)
         {
+            if (data == null)
+            {
+                data = gruntData;
+            }
+
             int column = UnityEngine.Random.Range(0, gameConfig.columns);
-            Vector3 lanePosition = battleGrid.GetSlotWorldPosition(column, 0);
+            Vector3 lanePos = battleGrid.GetSlotWorldPosition(column, 0);
             float xOffset = UnityEngine.Random.Range(-gameConfig.cellSize * 0.18f, gameConfig.cellSize * 0.18f);
-            Vector3 spawnPosition = new(lanePosition.x + xOffset, spawnY, 0f);
+            Vector3 spawnPosition = new(lanePos.x + xOffset, spawnY, 0f);
 
             float healthMultiplier = waveNumber == 16 ? 5f : 1f + ((waveNumber - 1) * 0.12f);
             float attackMultiplier = waveNumber == 16 ? 2f : 1f;
-            float scaleMultiplier = waveNumber == 16 ? 1.45f : 1f;
+            float scaleMultiplier = waveNumber == 16 ? data.sizeScale * 1.45f : data.sizeScale;
+            float variantDampener = waveNumber <= 5 && data.enemyType != EnemyType.Grunt ? 0.75f : 1f;
+            float speedMultiplier = 1f;
+            if (data.enemyType == EnemyType.Rusher && waveNumber <= 3)
+            {
+                speedMultiplier = 0.8f;
+            }
+            else if (data.enemyType == EnemyType.Flyer && waveNumber <= 5)
+            {
+                speedMultiplier = 0.7f;
+            }
 
             Enemy enemy = Instantiate(enemyPrefab, parent);
-            enemy.Initialize(gruntData, gameConfig, battleGrid, this, column, spawnPosition, failY, healthMultiplier, attackMultiplier, scaleMultiplier);
+            enemy.Initialize(
+                data,
+                gameConfig,
+                battleGrid,
+                this,
+                column,
+                spawnPosition,
+                failY,
+                healthMultiplier * variantDampener,
+                attackMultiplier,
+                scaleMultiplier,
+                speedMultiplier);
             spawnedThisWave++;
             activeEnemyCount++;
         }
 
-        private int GetEnemyCountForWave(int waveNumber)
+        private List<EnemyData> GetWaveEnemies(int wave)
         {
-            if (waveNumber == 16)
+            EnemyData r = rusherData != null ? rusherData : gruntData;
+            EnemyData t = tankData != null ? tankData : gruntData;
+            EnemyData f = flyerData != null ? flyerData : gruntData;
+            List<EnemyData> enemies = new(RegularWaveCounts[Mathf.Clamp(wave - 1, 0, RegularWaveCounts.Length - 1)]);
+
+            if (wave == 1)
             {
-                return 1;
+                AddEnemies(enemies, gruntData, 3);
+            }
+            else if (wave == 2)
+            {
+                AddEnemies(enemies, gruntData, 3);
+                AddEnemies(enemies, r, 1);
+            }
+            else if (wave == 3)
+            {
+                AddEnemies(enemies, gruntData, 4);
+                AddEnemies(enemies, t, 1);
+            }
+            else if (wave == 4)
+            {
+                AddEnemies(enemies, gruntData, 4);
+                AddEnemies(enemies, r, 2);
+            }
+            else if (wave == 5)
+            {
+                AddEnemies(enemies, gruntData, 4);
+                AddEnemies(enemies, t, 1);
+                AddEnemies(enemies, f, 1);
+            }
+            else if (wave == 6)
+            {
+                AddEnemies(enemies, gruntData, 3);
+                AddEnemies(enemies, r, 2);
+                AddEnemies(enemies, t, 1);
+            }
+            else if (wave == 7)
+            {
+                AddEnemies(enemies, gruntData, 3);
+                AddEnemies(enemies, r, 1);
+                AddEnemies(enemies, t, 2);
+                AddEnemies(enemies, f, 1);
+            }
+            else if (wave == 8)
+            {
+                AddEnemies(enemies, gruntData, 2);
+                AddEnemies(enemies, r, 2);
+                AddEnemies(enemies, t, 1);
+                AddEnemies(enemies, f, 2);
+            }
+            else if (wave <= 10)
+            {
+                AddEnemies(enemies, gruntData, 3);
+                AddEnemies(enemies, r, 2);
+                AddEnemies(enemies, t, 2);
+                AddEnemies(enemies, f, 2);
+            }
+            else if (wave <= 12)
+            {
+                AddEnemies(enemies, gruntData, 2);
+                AddEnemies(enemies, r, 3);
+                AddEnemies(enemies, t, 2);
+                AddEnemies(enemies, f, 3);
+            }
+            else if (wave <= 15)
+            {
+                AddEnemies(enemies, gruntData, 2);
+                AddEnemies(enemies, r, 3);
+                AddEnemies(enemies, t, 3);
+                AddEnemies(enemies, f, 4);
+            }
+            else
+            {
+                AddEnemies(enemies, gruntData, RegularWaveCounts[Mathf.Clamp(wave - 1, 0, RegularWaveCounts.Length - 1)]);
             }
 
-            int index = Mathf.Clamp(waveNumber - 1, 0, RegularWaveCounts.Length - 1);
-            return RegularWaveCounts[index];
+            return enemies;
+        }
+
+        private static void AddEnemies(List<EnemyData> enemies, EnemyData data, int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                enemies.Add(data);
+            }
         }
 
         private void EvaluateWaveCleared()
@@ -208,6 +322,21 @@ namespace MergeAndMarch.Gameplay
                 gruntData = AssetDatabase.LoadAssetAtPath<EnemyData>("Assets/_MergeAndMarch/ScriptableObjects/Grunt.asset");
             }
 
+            if (rusherData == null)
+            {
+                rusherData = AssetDatabase.LoadAssetAtPath<EnemyData>("Assets/_MergeAndMarch/ScriptableObjects/Rusher.asset");
+            }
+
+            if (tankData == null)
+            {
+                tankData = AssetDatabase.LoadAssetAtPath<EnemyData>("Assets/_MergeAndMarch/ScriptableObjects/Tank.asset");
+            }
+
+            if (flyerData == null)
+            {
+                flyerData = AssetDatabase.LoadAssetAtPath<EnemyData>("Assets/_MergeAndMarch/ScriptableObjects/Flyer.asset");
+            }
+
             if (enemyPrefab == null)
             {
                 enemyPrefab = AssetDatabase.LoadAssetAtPath<Enemy>("Assets/_MergeAndMarch/Prefabs/EnemyPrefab.prefab");
@@ -216,4 +345,3 @@ namespace MergeAndMarch.Gameplay
         }
     }
 }
-

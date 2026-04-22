@@ -130,6 +130,14 @@ namespace MergeAndMarch.Gameplay
             float damage = GetAttackDamageFor(troop);
             if (troop.Data.troopType == TroopType.Archer)
             {
+                if (target.Data != null && target.Data.enemyType == EnemyType.Tank)
+                {
+                    RunBuffs buffs = CardSystem.Instance != null ? CardSystem.Instance.runBuffs : null;
+                    if (buffs != null)
+                    {
+                        damage *= buffs.archerVsTankMultiplier;
+                    }
+                }
                 StartCoroutine(FireProjectileRoutine(troop, target, damage));
                 return;
             }
@@ -167,6 +175,7 @@ namespace MergeAndMarch.Gameplay
             IReadOnlyList<Enemy> enemies = Enemy.ActiveEnemies;
             Enemy best = null;
             float bestDistance = float.MaxValue;
+            RunBuffs buffs = CardSystem.Instance != null ? CardSystem.Instance.runBuffs : null;
 
             for (int i = 0; i < enemies.Count; i++)
             {
@@ -180,6 +189,12 @@ namespace MergeAndMarch.Gameplay
                 if (troop.Data.troopType == TroopType.Knight)
                 {
                     if (enemy.LaneColumn != troop.Column)
+                    {
+                        continue;
+                    }
+
+                    bool isFlyer = enemy.Data != null && enemy.Data.skipsFrontline;
+                    if (isFlyer && (buffs == null || !buffs.knightCanHitFlyers))
                     {
                         continue;
                     }

@@ -24,6 +24,8 @@ namespace MergeAndMarch.Data
         SpawnHealer,
         SpawnBomber,
         HealerBoost,
-        BomberRadius
+        BomberRadius,
+        ArcherDoubleDamageVsTank,
+        KnightDamageFlyers
     }
 }

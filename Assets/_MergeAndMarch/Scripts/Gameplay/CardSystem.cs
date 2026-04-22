@@ -26,8 +26,10 @@ namespace MergeAndMarch.Gameplay
         public static CardSystem Instance { get; private set; }
         public RunBuffs runBuffs = new();
         public event Action CardPickCompleted;
+        public event Action RunBuffsChanged;
 
         public IReadOnlyList<CardData> AllCards => allCards;
+        public IReadOnlyList<CardData> CurrentChoices => currentChoices;
         public bool IsCardPickActive => cardSelectionUI != null && cardSelectionUI.IsVisible;
 
         private void Awake()
@@ -48,6 +50,7 @@ namespace MergeAndMarch.Gameplay
             runBuffs = new RunBuffs();
             selectedCard = null;
             cardSelectionUI?.Hide();
+            NotifyRunBuffsChanged();
         }
 
         public void StartCardPick()
@@ -163,7 +166,15 @@ namespace MergeAndMarch.Gameplay
                 case CardEffectType.MergeHeal:
                     runBuffs.mergeHealPercent = card.effectValue;
                     break;
+                case CardEffectType.ArcherDoubleDamageVsTank:
+                    runBuffs.archerVsTankMultiplier = card.effectValue;
+                    break;
+                case CardEffectType.KnightDamageFlyers:
+                    runBuffs.knightCanHitFlyers = true;
+                    break;
             }
+
+            NotifyRunBuffsChanged();
         }
 
         public bool ConsumeNextMergeBoost()
@@ -174,7 +185,69 @@ namespace MergeAndMarch.Gameplay
             }
 
             runBuffs.nextMergeBoosted = false;
+            NotifyRunBuffsChanged();
             return true;
+        }
+
+        public string GetActiveBuffSummary()
+        {
+            List<string> lines = new() { "Active Buffs:" };
+
+            AddPercentLine(lines, runBuffs.attackMultiplier - 1f, "ATK");
+            AddPercentLine(lines, runBuffs.hpMultiplier - 1f, "HP");
+            AddPercentLine(lines, runBuffs.knightAttackMultiplier - 1f, "Knight ATK");
+            AddPercentLine(lines, runBuffs.archerAttackMultiplier - 1f, "Archer ATK");
+            AddPercentLine(lines, runBuffs.mageAttackMultiplier - 1f, "Mage ATK");
+            AddPercentLine(lines, runBuffs.healerPowerMultiplier - 1f, "Healer Power");
+            AddPercentLine(lines, runBuffs.bomberAttackMultiplier - 1f, "Bomber ATK");
+            AddPercentLine(lines, runBuffs.bomberRadiusMultiplier - 1f, "Bomber Radius");
+
+            if (runBuffs.archerSpeedMultiplier < 0.999f)
+            {
+                AddPercentLine(lines, (1f / runBuffs.archerSpeedMultiplier) - 1f, "Archer Speed");
+            }
+
+            if (runBuffs.knightThornsDamage > 0f)
+            {
+                lines.Add($"Knight Thorns +{Mathf.RoundToInt(runBuffs.knightThornsDamage)}");
+            }
+
+            if (runBuffs.mergeHealPercent > 0f)
+            {
+                lines.Add($"Merge Heal +{Mathf.RoundToInt(runBuffs.mergeHealPercent * 100f)}%");
+            }
+
+            if (runBuffs.extraDeployCount > 0)
+            {
+                lines.Add($"+{runBuffs.extraDeployCount} Deploy");
+            }
+
+            if (runBuffs.nextMergeBoosted)
+            {
+                lines.Add("Next Merge +1 Tier");
+            }
+
+            if (!Mathf.Approximately(runBuffs.coinMultiplier, 1f))
+            {
+                lines.Add($"{runBuffs.coinMultiplier:0.##}x Coins");
+            }
+
+            if (runBuffs.archerVsTankMultiplier > 1.01f)
+            {
+                lines.Add($"Piercing Arrow {runBuffs.archerVsTankMultiplier:0.##}x vs Tank");
+            }
+
+            if (runBuffs.knightCanHitFlyers)
+            {
+                lines.Add("Knights hit Flyers");
+            }
+
+            if (lines.Count == 1)
+            {
+                lines.Add("None");
+            }
+
+            return string.Join("\n", lines);
         }
 
         private void ApplyHpBoost(float effectValue)
@@ -308,6 +381,21 @@ namespace MergeAndMarch.Gameplay
                 }
             }
 #endif
+        }
+
+        private void NotifyRunBuffsChanged()
+        {
+            RunBuffsChanged?.Invoke();
+        }
+
+        private void AddPercentLine(List<string> lines, float amount, string label)
+        {
+            if (amount <= 0.001f)
+            {
+                return;
+            }
+
+            lines.Add($"+{Mathf.RoundToInt(amount * 100f)}% {label}");
         }
     }
 }

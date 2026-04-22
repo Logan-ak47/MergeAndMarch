@@ -6,11 +6,11 @@
 
 ## PROJECT STATUS
 
-**Current Phase:** Phase 2 - Roguelike Cards + Enemy Variety
-**Session Count:** 7
-**Last Session Date:** 2026-04-16
-**Last Session Summary:** Added Mage, Healer, and Bomber as full troop types with distinct mechanics: Mage now uses AoE band attacks with a visible purple sweep, Healer now heals the lowest-HP adjacent ally with a green pulse, and Bomber now explodes on enemy row contact, deactivates for the wave, and respawns next wave. Also added weighted deployment support for Mage/Healer, 5 new troop-specific cards, explicit troop targeting data, and optional debug lineup hotkeys.
-**Next Task:** Session 8: Enemy variety (Rusher, Tank, Flyer)
+**Current Phase:** Phase 2 - Roguelike Cards + Readability + Enemy Variety
+**Session Count:** 9
+**Last Session Date:** 2026-04-22
+**Last Session Summary:** Session 9 is complete. Merge highlighting, HP bar stabilization, and earlier enemy-variety tuning are all in. Merge highlighting now reliably shows valid targets and appears to have solved the earlier "sometimes nothing happens" feedback during drag/merge testing. The HP bar merge-reset bug is fixed: merged troops return to full HP with the bar hidden, and damaged troops/enemies now show correct World Space Canvas fillAmount bars. Follow-up automated run reports were added to `Assets/_MergeAndMarch/TestReports/` to establish an initial win-rate baseline.
+**Next Task:** Session 10: Balance/tuning based on win rate observations
 
 ---
 
@@ -174,15 +174,20 @@ Assets/_MergeAndMarch/
 - `WaveManager` now owns the run lifecycle: wave start, card pick, deployment, victory, defeat, and restart.
 - `CardSystem` now owns run buffs, weighted card rolls, effect application, and card-pick completion signaling.
 - `CardSelectionUI` builds a simple runtime 3-card selection panel on the overlay canvas.
-- `EnemySpawner` handles per-wave counts, staggered spawns, HP scaling, the boss wave, and wave-clear tracking.
+- `EnemySpawner` handles per-wave enemy composition (`GetWaveEnemies`), staggered spawns, HP/scale multipliers, the boss wave, and wave-clear tracking. Wave 16 remains a scaled Grunt boss. Rusher/Tank/Flyer data auto-load in editor via `AssetDatabase`; null data falls back to grunt.
+- `EnemyData` now has `sizeScale` (base visual scale, multiplied by `enemyBaseScale`), `skipsFrontline` (Flyer: skip Row 0 troops and Row 0 bombers), and `renderYOffset` (Flyer: shift spawn +0.3 Y so it renders above the frontline lane).
 - `DeploymentSystem` can now deploy multiple troops for a single wave, handles card-driven troop spawn effects, excludes Bomber from random deployment, and weights normal deployments toward the starting lineup composition.
-- `MergeController` now consumes one-shot merge boosts and applies merge-heal buffs to adjacent troops.
+- `MergeController` now consumes one-shot merge boosts, applies merge-heal buffs to adjacent troops, and reports successful merges into the HUD merge counter.
+- Merge highlighting is now working consistently in play: valid targets pulse, non-valid troops dim, and the earlier "sometimes nothing happens" merge-feedback issue does not appear to be reproducing after the Session 9 fix pass.
 - `AutoCombat` now routes troop actions through explicit targeting types: ranged/melee attacks, Mage AoE bands, and Healer support pulses. Bomber triggering is handled by enemy row contact instead of the normal combat tick.
-- `Enemy` now handles Bomber row-contact triggering and still applies Knight thorns when appropriate.
+- `Enemy` now handles Bomber row-contact triggering, still applies Knight thorns when appropriate, and spawns floating damage numbers for each damage instance.
 - `Troop.MaxHP` now respects run HP buffs, and HP-boost cards heal the granted difference immediately.
-- `Troop` now supports single-use Bomber behavior, `HasExplodedThisWave`, bomber respawn/reset on wave start, inactive-state drag lockout, and tier-scaled healer support power.
+- `Troop` now supports single-use Bomber behavior, `HasExplodedThisWave`, bomber respawn/reset on wave start, inactive-state drag lockout, tier-scaled healer support power, runtime HP bars, and upgraded tier-glow visuals with a T3 pulse.
+- HP bars are World Space Canvas with UI Images using `fillAmount`. Hierarchy: Prefab -> `HPBarRoot` (`Canvas`) -> `Background` + `Fill`. `Fill` image is `Type=Filled`, `Method=Horizontal`, `Origin=Left`. References are assigned via Inspector. The stale merged-HP-bar bug is fixed.
 - BattleGrid clears dead troops reliably so their slots reopen for next-wave deployment and revive/spawn cards.
 - The three new troop visuals are currently communicated with lightweight prototype FX: Mage purple sweep, Healer green pulse, and Bomber orange explosion circle.
+- `WaveManager` now builds a richer runtime HUD with merge count and active-buff text alongside the existing wave/coin labels.
+- `CardSystem` now emits buff-change notifications and can summarize the currently active run buffs for HUD display.
 - Starting lineup is still the default 2 Knights + 2 Archers for production flow, but the runtime now supports all 5 troop types and includes optional keyboard lineup presets for faster testing.
 - TextMeshPro is imported and the temporary fallback path is no longer needed.
 - Troop placeholder sprite tiling warnings were removed by switching to simple sprite scaling.
@@ -287,6 +292,15 @@ Assets/_MergeAndMarch/
 **Provisional troop feel:** Mage currently looks like the strongest readability win, Healer is most likely to need tuning or stronger combat pressure to feel impactful, and Bomber may need trap timing/radius tuning depending on how often waves naturally enter its trigger zone.
 **Kill criteria status:** The troop roster now has real mechanical variety, but composition quality and relative troop value still need live playtesting to confirm.
 
+### Session 8 - 2026-04-22
+**Duration:** Two-part session — readability pass + enemy variety
+**Part 1 Built:** Runtime troop/enemy HP bars that only show when damaged, clearer T2/T3 tier visuals with glow treatment and a subtle T3 pulse using unscaled time, floating world-space damage numbers for enemy hits, an active-buffs HUD panel, and a merge counter integrated into the top HUD.
+**Part 3 Built:** Two counter-enemy cards — "Piercing Arrow" (Rare, Archer 2× vs Tank) and "Ground Slam" (Rare, Knights can hit Flyers in backline). Added `ArcherDoubleDamageVsTank` and `KnightDamageFlyers` to `CardEffectType`. Added `archerVsTankMultiplier` and `knightCanHitFlyers` to `RunBuffs`. Updated `AutoCombat.ResolveAttack` to check the Tank multiplier when an Archer fires at a Tank, and updated `FindTargetFor` so Knights skip Flyers by default and target them only when `knightCanHitFlyers` is active. Both buffs appear in the active-buffs HUD panel. Both card assets auto-load via `FindAssets` scan of the Cards folder.
+**Part 2 Built:** Three new enemy types — Rusher (fast/fragile, yellow-orange, scale 0.85), Tank (slow/massive HP, dark red, scale 1.3), and Flyer (skips Row 0 frontline, attacks backline directly, cyan, renderYOffset 0.3). Added `sizeScale`, `skipsFrontline`, and `renderYOffset` fields to `EnemyData`. Updated `Enemy.cs` to apply `renderYOffset` to spawn position, skip Row 0 troops/bombers for Flyers in `FindBlockingTroop` and `TryTriggerBomberInRowZone`. Rewrote `EnemySpawner` with `GetWaveEnemies()` composition logic covering waves 1–15 (grunts-only early, then Rushers wave 4-5, Tank wave 6, Flyer wave 8, full mix waves 9+). Created `Rusher.asset`, `Tank.asset`, and `Flyer.asset` ScriptableObjects.
+**Issues:** Enemy type visuals are still prototype (color tint only — no distinct sprites). Flyer visual distinction relies on cyan tint + 0.3 Y offset; a "wing" sprite would strengthen it but requires art. Row 0 bombers intentionally do NOT trigger from Flyers (mechanical reward for Row 1 bomber placement).
+**Next:** Session 9 — playtesting and tuning pass across the full 15-wave run, or next Phase 2 feature.
+**Kill criteria status:** The enemy roster now has real mechanical variety. Rusher punishes slow builds, Tank punishes Tier-1 swarms, Flyer punishes pure-frontline strategies. Readability improvements from Part 1 should make the new threats legible immediately.
+
 ---
 
 ## REFERENCE FILES
@@ -294,4 +308,3 @@ Assets/_MergeAndMarch/
 - `MERGE_AND_MARCH_GDD.md` - Full game design document
 - `PHASE1_SETUP.md` - Unity setup notes
 - `CLAUDE_CONTEXT.md` - Session continuity file
-

@@ -685,6 +685,7 @@ MonoBehaviour:
   gameConfig: {fileID: 11400000, guid: 7b876e7341a6c2b479067744ed8a3e71, type: 2}
   battleGrid: {fileID: 942182596}
   targetCamera: {fileID: 1582025892}
+  waveManager: {fileID: 0}
 --- !u!4 &963990068
 Transform:
   m_ObjectHideFlags: 0

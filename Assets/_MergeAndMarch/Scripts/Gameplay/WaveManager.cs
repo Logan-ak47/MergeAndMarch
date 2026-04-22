@@ -35,6 +35,8 @@ namespace MergeAndMarch.Gameplay
         private Canvas hudCanvas;
         private TextMeshProUGUI waveCounterText;
         private TextMeshProUGUI coinCounterText;
+        private TextMeshProUGUI mergeCounterText;
+        private TextMeshProUGUI activeBuffsText;
         private TextMeshProUGUI waveClearedText;
         private TextMeshProUGUI runEndText;
         private bool runActive;
@@ -42,10 +44,15 @@ namespace MergeAndMarch.Gameplay
         private bool cardPickCompleted;
         private int currentWave;
         private int totalCoins;
+        private int mergeCount;
 
         public WaveState State { get; private set; } = WaveState.Idle;
         public int CurrentWave => currentWave;
         public int TotalCoins => totalCoins;
+        public int MergeCount => mergeCount;
+        public bool IsRunActive => runActive;
+        public bool HasRunEnded => runEnded;
+        public bool AutoRestartOnRunEnd { get; set; } = true;
 
         private void Awake()
         {
@@ -54,6 +61,7 @@ namespace MergeAndMarch.Gameplay
             if (cardSystem != null)
             {
                 cardSystem.CardPickCompleted += HandleCardPickCompleted;
+                cardSystem.RunBuffsChanged += UpdateActiveBuffs;
             }
         }
 
@@ -67,6 +75,7 @@ namespace MergeAndMarch.Gameplay
             if (cardSystem != null)
             {
                 cardSystem.CardPickCompleted -= HandleCardPickCompleted;
+                cardSystem.RunBuffsChanged -= UpdateActiveBuffs;
             }
         }
 
@@ -112,12 +121,26 @@ namespace MergeAndMarch.Gameplay
             autoCombat?.ResetAttackTimers();
             currentWave = 0;
             totalCoins = 0;
+            mergeCount = 0;
             runActive = true;
             runEnded = false;
             State = WaveState.Idle;
             UpdateCoinCounter();
             UpdateWaveCounter();
+            UpdateMergeCounter();
+            UpdateActiveBuffs();
             runRoutine = StartCoroutine(RunLoop());
+        }
+
+        public void RegisterMerge()
+        {
+            if (!runActive || runEnded)
+            {
+                return;
+            }
+
+            mergeCount++;
+            UpdateMergeCounter();
         }
 
         private IEnumerator RunLoop()
@@ -206,7 +229,10 @@ namespace MergeAndMarch.Gameplay
             State = WaveState.Victory;
             autoCombat?.SetCombatEnabled(false);
             ShowRunEnd("VICTORY!");
-            restartRoutine = StartCoroutine(RestartAfterDelay());
+            if (AutoRestartOnRunEnd)
+            {
+                restartRoutine = StartCoroutine(RestartAfterDelay());
+            }
         }
 
         private void TriggerDefeat()
@@ -223,7 +249,10 @@ namespace MergeAndMarch.Gameplay
             State = WaveState.Defeat;
             autoCombat?.SetCombatEnabled(false);
             ShowRunEnd("DEFEATED");
-            restartRoutine = StartCoroutine(RestartAfterDelay());
+            if (AutoRestartOnRunEnd)
+            {
+                restartRoutine = StartCoroutine(RestartAfterDelay());
+            }
         }
 
         private IEnumerator RestartAfterDelay()
@@ -323,6 +352,17 @@ namespace MergeAndMarch.Gameplay
                 coinCounterText = CreateText("CoinCounter", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-36f, -40f), new Vector2(240f, 60f), 30, TextAlignmentOptions.Right);
             }
 
+            if (mergeCounterText == null)
+            {
+                mergeCounterText = CreateText("MergeCounter", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -78f), new Vector2(260f, 38f), 22, TextAlignmentOptions.Center);
+            }
+
+            if (activeBuffsText == null)
+            {
+                activeBuffsText = CreateText("ActiveBuffsText", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -24f), new Vector2(320f, 200f), 14, TextAlignmentOptions.TopLeft);
+                activeBuffsText.enableWordWrapping = false;
+            }
+
             if (waveClearedText == null)
             {
                 waveClearedText = CreateText("WaveClearedText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(600f, 80f), 42, TextAlignmentOptions.Center);
@@ -391,6 +431,24 @@ namespace MergeAndMarch.Gameplay
             {
                 coinCounterText.text = $"Coins: {totalCoins}";
             }
+        }
+
+        private void UpdateMergeCounter()
+        {
+            if (mergeCounterText != null)
+            {
+                mergeCounterText.text = $"Merges: {mergeCount}";
+            }
+        }
+
+        private void UpdateActiveBuffs()
+        {
+            if (activeBuffsText == null)
+            {
+                return;
+            }
+
+            activeBuffsText.text = cardSystem != null ? cardSystem.GetActiveBuffSummary() : "Active Buffs:\nNone";
         }
 
         private void ShowRunEnd(string message)

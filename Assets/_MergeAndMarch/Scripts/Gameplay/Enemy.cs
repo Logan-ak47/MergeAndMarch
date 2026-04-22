@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using MergeAndMarch.Data;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace MergeAndMarch.Gameplay
 {
@@ -11,11 +12,14 @@ namespace MergeAndMarch.Gameplay
     {
         private static readonly List<Enemy> activeEnemyBuffer = new();
         private static Sprite fallbackSprite;
+        private static readonly Color HpBarFillColor = new(1f, 0.2667f, 0.2667f, 1f);
 
         private readonly List<Troop> troopBuffer = new();
 
         [SerializeField] private SpriteRenderer spriteRenderer;
         [SerializeField] private BoxCollider2D boxCollider;
+        [SerializeField] private GameObject hpBarRoot;
+        [SerializeField] private Image hpBarFillImage;
 
         private GameConfig gameConfig;
         private BattleGrid battleGrid;
@@ -34,7 +38,7 @@ namespace MergeAndMarch.Gameplay
         private Coroutine deathRoutine;
         private Vector3 lanePosition;
         private Vector3 configuredScale = Vector3.one;
-
+        private float moveSpeed = 1f;
         public EnemyData Data { get; private set; }
         public int LaneColumn { get; private set; }
         public float MaxHP => maxHP;
@@ -44,6 +48,7 @@ namespace MergeAndMarch.Gameplay
         private void Reset()
         {
             CacheComponents();
+            ResolveHpBarReferences();
             ConfigureCollider();
         }
 
@@ -51,6 +56,7 @@ namespace MergeAndMarch.Gameplay
         {
             CacheComponents();
             CaptureBaseSpriteSize();
+            ResolveHpBarReferences();
             ConfigureCollider();
         }
 
@@ -118,6 +124,11 @@ namespace MergeAndMarch.Gameplay
                     continue;
                 }
 
+                if (Data != null && Data.skipsFrontline && troop.Row == 0)
+                {
+                    continue;
+                }
+
                 if (Mathf.Abs(transform.position.y - troop.transform.position.y) > rowZoneHalfHeight)
                 {
                     continue;
@@ -140,7 +151,8 @@ namespace MergeAndMarch.Gameplay
             float failLineY,
             float healthMultiplier = 1f,
             float attackMultiplier = 1f,
-            float scaleMultiplier = 1f)
+            float scaleMultiplier = 1f,
+            float moveSpeedMultiplier = 1f)
         {
             Data = enemyData;
             gameConfig = config;
@@ -153,11 +165,13 @@ namespace MergeAndMarch.Gameplay
             maxHP = Data != null ? Data.baseHP * Mathf.Max(0.01f, healthMultiplier) : 0f;
             currentHP = maxHP;
             attackDamage = Data != null ? Data.baseAttack * Mathf.Max(0.01f, attackMultiplier) : 0f;
+            moveSpeed = Data != null ? Data.moveSpeed * Mathf.Max(0.01f, moveSpeedMultiplier) : 0f;
             attackTimer = Random.Range(0f, Mathf.Max(0.05f, Data != null ? Data.attackInterval * 0.5f : 0.25f));
-            lanePosition = spawnPosition;
+            lanePosition = transform.position;
 
             name = Data != null ? $"{Data.displayName}_{laneColumn}" : "Enemy";
-            transform.position = spawnPosition;
+            Vector3 visualSpawnPos = spawnPosition + new Vector3(0f, Data != null ? Data.renderYOffset : 0f, 0f);
+            transform.position = visualSpawnPos;
 
             if (spriteRenderer != null && Data != null)
             {
@@ -174,6 +188,8 @@ namespace MergeAndMarch.Gameplay
             transform.localScale = configuredScale;
             ConfigureCollider();
             boxCollider.enabled = true;
+            ResolveHpBarReferences();
+            UpdateHPBar();
         }
 
         public bool ApplyDamage(float damage)
@@ -183,8 +199,14 @@ namespace MergeAndMarch.Gameplay
                 return true;
             }
 
-            currentHP = Mathf.Max(0f, currentHP - Mathf.Max(0f, damage));
+            float appliedDamage = Mathf.Max(0f, damage);
+            currentHP = Mathf.Max(0f, currentHP - appliedDamage);
             StartFlash(Color.white, 0.1f);
+            UpdateHPBar();
+            if (appliedDamage > 0.01f)
+            {
+                DamageNumber.Spawn(transform.position + (Vector3.up * 0.15f), appliedDamage, Color.white);
+            }
             if (!IsAlive)
             {
                 owner?.NotifyEnemyDefeated(this);
@@ -213,7 +235,7 @@ namespace MergeAndMarch.Gameplay
 
         private void MoveForward()
         {
-            transform.position += Vector3.down * (Data.moveSpeed * Time.deltaTime);
+            transform.position += Vector3.down * (moveSpeed * Time.deltaTime);
             lanePosition = transform.position;
             if (!hasEscaped && transform.position.y < failY)
             {
@@ -235,6 +257,11 @@ namespace MergeAndMarch.Gameplay
             {
                 Troop troop = troopBuffer[i];
                 if (troop == null || !troop.IsCombatActive || troop.Column != LaneColumn)
+                {
+                    continue;
+                }
+
+                if (Data != null && Data.skipsFrontline && troop.Row == 0)
                 {
                     continue;
                 }
@@ -464,5 +491,53 @@ namespace MergeAndMarch.Gameplay
             boxCollider.offset = Vector2.zero;
             boxCollider.size = baseSpriteSize * 0.9f;
         }
+
+        private void ResolveHpBarReferences()
+        {
+            if (hpBarRoot == null)
+            {
+                hpBarRoot = transform.Find("HPBarRoot")?.gameObject;
+            }
+
+            if (hpBarFillImage == null && hpBarRoot != null)
+            {
+                hpBarFillImage = hpBarRoot.transform.Find("Fill")?.GetComponent<Image>();
+            }
+        }
+
+        private void UpdateHPBar()
+        {
+            if (hpBarRoot == null || hpBarFillImage == null)
+            {
+                ResolveHpBarReferences();
+            }
+
+            if (hpBarRoot == null || hpBarFillImage == null)
+            {
+                return;
+            }
+
+            if (maxHP <= 0.01f)
+            {
+                hpBarRoot.SetActive(false);
+                hpBarFillImage.fillAmount = 0f;
+                return;
+            }
+
+            float ratio = Mathf.Clamp01(currentHP / maxHP);
+            hpBarFillImage.fillAmount = ratio;
+            hpBarFillImage.color = HpBarFillColor;
+
+            bool shouldShow = currentHP > 0.01f && ratio < 0.999f && IsAlive;
+            hpBarRoot.SetActive(shouldShow);
+
+            Canvas canvas = hpBarRoot.GetComponent<Canvas>();
+            if (canvas != null && spriteRenderer != null)
+            {
+                canvas.sortingLayerName = spriteRenderer.sortingLayerName;
+                canvas.sortingOrder = spriteRenderer.sortingOrder + 2;
+            }
+        }
+
     }
 }

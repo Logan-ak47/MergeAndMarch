@@ -19,5 +19,7 @@ namespace MergeAndMarch.Gameplay
         public float mergeHealPercent = 0f;
         public int extraDeployCount = 0;
         public bool nextMergeBoosted = false;
+        public float archerVsTankMultiplier = 1f;
+        public bool knightCanHitFlyers = false;
     }
 }
