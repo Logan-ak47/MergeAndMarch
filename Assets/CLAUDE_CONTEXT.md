@@ -7,10 +7,10 @@
 ## PROJECT STATUS
 
 **Current Phase:** Phase 2 - Roguelike Cards + Readability + Enemy Variety
-**Session Count:** 9
-**Last Session Date:** 2026-04-22
-**Last Session Summary:** Session 9 is complete. Merge highlighting, HP bar stabilization, and earlier enemy-variety tuning are all in. Merge highlighting now reliably shows valid targets and appears to have solved the earlier "sometimes nothing happens" feedback during drag/merge testing. The HP bar merge-reset bug is fixed: merged troops return to full HP with the bar hidden, and damaged troops/enemies now show correct World Space Canvas fillAmount bars. Follow-up automated run reports were added to `Assets/_MergeAndMarch/TestReports/` to establish an initial win-rate baseline.
-**Next Task:** Session 10: Balance/tuning based on win rate observations
+**Session Count:** 10
+**Last Session Date:** 2026-04-23
+**Last Session Summary:** Session 10 focused on the merge moment so short gameplay clips read as a cared-about hybrid-casual prototype instead of a raw placeholder. `MergeController` now runs a stronger three-beat merge sequence: both source troops flash white, a troop-colored particle burst fires at the merge point, the result troop pops in with a bouncy overshoot, and the camera gets a subtle shake. DOTween is still not present in `Packages/manifest.json`, so the pop/shake are implemented with unscaled coroutine animation to keep the project compiling. A runtime particle fallback was added so the burst works even before a prefab is wired. The requested baseline clip capture still needs to be recorded manually.
+**Next Task:** Session 11: continue the clip-readiness pass, wire a dedicated `MergeBurstFX` prefab if desired, and capture before/after gameplay footage for honest public-facing A/B comparison.
 
 ---
 
@@ -179,6 +179,7 @@ Assets/_MergeAndMarch/
 - `DeploymentSystem` can now deploy multiple troops for a single wave, handles card-driven troop spawn effects, excludes Bomber from random deployment, and weights normal deployments toward the starting lineup composition.
 - `MergeController` now consumes one-shot merge boosts, applies merge-heal buffs to adjacent troops, and reports successful merges into the HUD merge counter.
 - Merge highlighting is now working consistently in play: valid targets pulse, non-valid troops dim, and the earlier "sometimes nothing happens" merge-feedback issue does not appear to be reproducing after the Session 9 fix pass.
+- `MergeController` now gives merges a clearer mini-cutscene: source troops flash white, a troop-colored merge burst fires at the destination, the upgraded troop pops in with a stronger overshoot, and the camera gets a subtle shake. This is coroutine-driven for now because DOTween is still not installed in the project manifest.
 - `AutoCombat` now routes troop actions through explicit targeting types: ranged/melee attacks, Mage AoE bands, and Healer support pulses. Bomber triggering is handled by enemy row contact instead of the normal combat tick.
 - `Enemy` now handles Bomber row-contact triggering, still applies Knight thorns when appropriate, and spawns floating damage numbers for each damage instance.
 - `Troop.MaxHP` now respects run HP buffs, and HP-boost cards heal the granted difference immediately.
@@ -300,6 +301,20 @@ Assets/_MergeAndMarch/
 **Issues:** Enemy type visuals are still prototype (color tint only — no distinct sprites). Flyer visual distinction relies on cyan tint + 0.3 Y offset; a "wing" sprite would strengthen it but requires art. Row 0 bombers intentionally do NOT trigger from Flyers (mechanical reward for Row 1 bomber placement).
 **Next:** Session 9 — playtesting and tuning pass across the full 15-wave run, or next Phase 2 feature.
 **Kill criteria status:** The enemy roster now has real mechanical variety. Rusher punishes slow builds, Tank punishes Tier-1 swarms, Flyer punishes pure-frontline strategies. Readability improvements from Part 1 should make the new threats legible immediately.
+
+### Session 9 - 2026-04-22
+**Duration:** Readability + stability polish session
+**Built:** Reliable merge-target highlighting, troop/enemy HP bar stabilization, cleanup on earlier enemy-variety work, and follow-up automated run reports under `Assets/_MergeAndMarch/TestReports/` to establish an initial win-rate baseline.
+**Issues:** Session bookkeeping had drifted toward balance/tuning even though presentation polish was becoming the more urgent bottleneck for public-facing clips.
+**Next:** Put polish directly onto the merge moment so viewers judge the core idea rather than the placeholder snap-change.
+**Kill criteria status:** Readability improved, but the merge still looked too prototype-heavy for a 10-second public clip.
+
+### Session 10 - 2026-04-23
+**Duration:** Merge juice / clip-readiness session
+**Built:** Reworked `MergeController` merge feedback into a clearer three-beat sequence: white flash on both source troops, troop-colored merge burst at the target slot, subtle merge camera shake, and a stronger bouncy pop-in for the upgraded troop. Added serialized tuning fields plus a runtime-configured particle-system fallback so the effect works immediately even without a prefab assignment.
+**Issues:** DOTween is still not installed in the project manifest, so the requested pop/shake were recreated with coroutine easing instead of DOTween calls. The requested baseline recording step still needs to be done manually in-editor or with external capture.
+**Next:** Continue presentation polish beyond the merge moment, decide whether to install DOTween and/or author a dedicated `MergeBurstFX` prefab asset, then capture before/after footage for honest external feedback.
+**Kill criteria status:** The core merge beat should read much less like a raw prototype, but public-clip readiness still needs a hands-on visual pass in Game view and actual footage capture.
 
 ---
 

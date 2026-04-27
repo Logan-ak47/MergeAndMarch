@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using MergeAndMarch.Core;
 using MergeAndMarch.Data;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.InputSystem;
 
 namespace MergeAndMarch.Gameplay
@@ -13,6 +14,17 @@ namespace MergeAndMarch.Gameplay
         [SerializeField] private BattleGrid battleGrid;
         [SerializeField] private Camera targetCamera;
         [SerializeField] private WaveManager waveManager;
+        [Header("Merge Juice")]
+        [SerializeField] private ParticleSystem mergeBurstPrefab;
+        [SerializeField] private float mergeBurstLifetime = 0.4f;
+        [SerializeField] private int mergeBurstCount = 25;
+        [SerializeField] private float mergeBurstRadius = 0.2f;
+        [SerializeField] private float mergeBurstSpeed = 3f;
+        [SerializeField] private float mergeResultPopDuration = 0.3f;
+        [SerializeField] private float mergeResultPopOvershoot = 1.7f;
+        [SerializeField] private float mergeShakeDuration = 0.2f;
+        [SerializeField] private float mergeShakeStrength = 0.15f;
+        [SerializeField] private int mergeShakeVibrato = 10;
 
         private Troop draggedTroop;
         private Vector3 dragOffset;
@@ -201,13 +213,9 @@ namespace MergeAndMarch.Gameplay
             Vector3 targetPosition = battleGrid.GetSlotWorldPosition(target.Column, target.Row);
             yield return AnimateMove(source, targetPosition, gameConfig.mergeSlideDuration);
 
-            Color targetColor = target.Renderer.color;
-            Color sourceColor = source.Renderer.color;
-            target.Renderer.color = Color.white;
-            source.Renderer.color = Color.white;
-            yield return WaitRealtime(gameConfig.mergeFlashDuration);
-            target.Renderer.color = targetColor;
-            source.Renderer.color = sourceColor;
+            yield return FlashTroopsWhite(source, target, gameConfig.mergeFlashDuration);
+            SpawnMergeBurst(targetPosition, ResolveMergeColor(target));
+            StartCoroutine(AnimateCameraShake());
 
             if (source != null)
             {
@@ -223,8 +231,8 @@ namespace MergeAndMarch.Gameplay
 
             ResolveWaveManager();
             waveManager?.RegisterMerge();
-            target.SetVisualSizeBoost(gameConfig.mergeOvershootScale);
-            yield return AnimateVisualSizeBoost(target, 1f, gameConfig.mergePopDuration);
+            target.SetVisualSizeBoost(0.01f);
+            yield return AnimateVisualPopIn(target, 0.01f, 1f, mergeResultPopDuration, mergeResultPopOvershoot);
             ApplyMergeHeal(target);
 
             draggedTroop = null;
@@ -414,6 +422,207 @@ namespace MergeAndMarch.Gameplay
             }
 
             troop.SetVisualSizeBoost(destinationBoost);
+        }
+
+        private IEnumerator AnimateVisualPopIn(Troop troop, float startBoost, float destinationBoost, float duration, float overshoot)
+        {
+            if (troop == null)
+            {
+                yield break;
+            }
+
+            float elapsed = 0f;
+            duration = Mathf.Max(0.01f, duration);
+            troop.SetVisualSizeBoost(startBoost);
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                float eased = EaseOutBack(t, overshoot);
+                float boost = Mathf.LerpUnclamped(startBoost, destinationBoost, eased);
+                troop.SetVisualSizeBoost(boost);
+                yield return null;
+            }
+
+            troop.SetVisualSizeBoost(destinationBoost);
+        }
+
+        private IEnumerator FlashTroopsWhite(Troop source, Troop target, float duration)
+        {
+            if (source == null || target == null || source.Renderer == null || target.Renderer == null)
+            {
+                yield break;
+            }
+
+            Color targetColor = target.Renderer.color;
+            Color sourceColor = source.Renderer.color;
+            target.Renderer.color = Color.white;
+            source.Renderer.color = Color.white;
+
+            yield return WaitRealtime(duration);
+
+            if (target != null && target.Renderer != null)
+            {
+                target.Renderer.color = targetColor;
+            }
+
+            if (source != null && source.Renderer != null)
+            {
+                source.Renderer.color = sourceColor;
+            }
+        }
+
+        private void SpawnMergeBurst(Vector3 position, Color troopColor)
+        {
+            ParticleSystem burst = mergeBurstPrefab != null
+                ? Instantiate(mergeBurstPrefab, position, Quaternion.identity)
+                : CreateRuntimeMergeBurst(position);
+
+            ConfigureMergeBurst(burst, troopColor);
+            burst.Play();
+            Destroy(burst.gameObject, mergeBurstLifetime + 0.35f);
+        }
+
+        private ParticleSystem CreateRuntimeMergeBurst(Vector3 position)
+        {
+            GameObject burstObject = new("MergeBurstFX");
+            burstObject.transform.position = position;
+            ParticleSystem burst = burstObject.AddComponent<ParticleSystem>();
+            ParticleSystemRenderer renderer = burst.GetComponent<ParticleSystemRenderer>();
+            renderer.sortingLayerName = "Effects";
+            renderer.sortingOrder = 8;
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+
+            return burst;
+        }
+
+        private void ConfigureMergeBurst(ParticleSystem burst, Color troopColor)
+        {
+            if (burst == null)
+            {
+                return;
+            }
+
+            burst.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+            var main = burst.main;
+            main.loop = false;
+            main.playOnAwake = false;
+            main.duration = mergeBurstLifetime;
+            main.startLifetime = mergeBurstLifetime;
+            main.startSpeed = mergeBurstSpeed;
+            main.startSize = 0.15f;
+            main.maxParticles = Mathf.Max(mergeBurstCount, 1);
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.scalingMode = ParticleSystemScalingMode.Local;
+            main.gravityModifier = 0f;
+
+            var emission = burst.emission;
+            emission.enabled = true;
+            emission.rateOverTime = 0f;
+            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)Mathf.Max(1, mergeBurstCount)) });
+
+            var shape = burst.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Circle;
+            shape.radius = mergeBurstRadius;
+
+            var sizeOverLifetime = burst.sizeOverLifetime;
+            sizeOverLifetime.enabled = true;
+            sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.EaseInOut(0f, 1f, 1f, 0f));
+
+            var colorOverLifetime = burst.colorOverLifetime;
+            colorOverLifetime.enabled = true;
+            Gradient gradient = new();
+            gradient.SetKeys(
+                new[]
+                {
+                    new GradientColorKey(Color.white, 0f),
+                    new GradientColorKey(troopColor, 0.45f),
+                    new GradientColorKey(troopColor, 1f)
+                },
+                new[]
+                {
+                    new GradientAlphaKey(1f, 0f),
+                    new GradientAlphaKey(0.9f, 0.45f),
+                    new GradientAlphaKey(0f, 1f)
+                });
+            colorOverLifetime.color = new ParticleSystem.MinMaxGradient(gradient);
+
+            var velocityOverLifetime = burst.velocityOverLifetime;
+            velocityOverLifetime.enabled = true;
+            velocityOverLifetime.space = ParticleSystemSimulationSpace.Local;
+            velocityOverLifetime.x = new ParticleSystem.MinMaxCurve(0f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
+            velocityOverLifetime.y = new ParticleSystem.MinMaxCurve(0f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
+
+            var limitVelocity = burst.limitVelocityOverLifetime;
+            limitVelocity.enabled = true;
+            limitVelocity.limit = mergeBurstSpeed;
+            limitVelocity.dampen = 0.9f;
+            limitVelocity.separateAxes = false;
+
+            var renderer = burst.GetComponent<ParticleSystemRenderer>();
+            if (renderer != null)
+            {
+                renderer.sortingLayerName = "Effects";
+                renderer.sortingOrder = 8;
+                renderer.shadowCastingMode = ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
+
+            burst.Clear();
+        }
+
+        private IEnumerator AnimateCameraShake()
+        {
+            if (targetCamera == null)
+            {
+                targetCamera = Camera.main;
+            }
+
+            if (targetCamera == null)
+            {
+                yield break;
+            }
+
+            Transform cameraTransform = targetCamera.transform;
+            Vector3 originalPosition = cameraTransform.position;
+            int shakes = Mathf.Max(1, mergeShakeVibrato);
+
+            for (int i = 0; i < shakes; i++)
+            {
+                float normalized = shakes <= 1 ? 1f : i / (float)(shakes - 1);
+                float strength = Mathf.Lerp(mergeShakeStrength, 0f, normalized);
+                Vector2 offset2D = Random.insideUnitCircle * strength;
+                cameraTransform.position = originalPosition + new Vector3(offset2D.x, offset2D.y, 0f);
+                yield return WaitRealtime(mergeShakeDuration / shakes);
+            }
+
+            cameraTransform.position = originalPosition;
+        }
+
+        private Color ResolveMergeColor(Troop troop)
+        {
+            if (troop != null && troop.Data != null)
+            {
+                return troop.Data.troopColor;
+            }
+
+            if (troop != null && troop.Renderer != null)
+            {
+                return troop.Renderer.color;
+            }
+
+            return Color.white;
+        }
+
+        private static float EaseOutBack(float t, float overshoot)
+        {
+            float c1 = overshoot;
+            float c3 = c1 + 1f;
+            float p = t - 1f;
+            return 1f + (c3 * p * p * p) + (c1 * p * p);
         }
 
         private IEnumerator WaitRealtime(float duration)
