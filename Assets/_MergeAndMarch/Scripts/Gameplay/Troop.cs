@@ -11,9 +11,12 @@ namespace MergeAndMarch.Gameplay
     public class Troop : MonoBehaviour
     {
         private static Sprite runtimeCircleSprite;
+        private static Sprite runtimeSquareSprite;
         private static readonly Color HpBarGreen = new(0.2667f, 1f, 0.5333f, 1f);
         private static readonly Color HpBarYellow = new(1f, 0.8667f, 0.2667f, 1f);
         private static readonly Color HpBarRed = new(1f, 0.2667f, 0.2667f, 1f);
+        private static readonly Color DamageNumberColor = new(1f, 0.36f, 0.28f, 1f);
+        private static readonly Color DeathArrowColor = new(1f, 0.12f, 0.12f, 0.95f);
 
         [SerializeField] private SpriteRenderer spriteRenderer;
         [SerializeField] private BoxCollider2D boxCollider;
@@ -51,8 +54,11 @@ namespace MergeAndMarch.Gameplay
         private bool hasExplodedThisWave;
         private bool isHighlighted;
         private bool isDimmed;
+        private bool hasLastAttackerPosition;
+        private bool deathIndicatorSpawned;
         private Vector3 mergeHighlightBaseScale = Vector3.one;
         private Vector3 baseScale = Vector3.one;
+        private Vector3 lastAttackerPosition;
         private float tierPulseScale = 1f;
 
         private void Reset()
@@ -96,12 +102,15 @@ namespace MergeAndMarch.Gameplay
             currentConfig = config;
             visualSizeBoost = 1f;
             hasExplodedThisWave = false;
+            hasLastAttackerPosition = false;
+            deathIndicatorSpawned = false;
 
             name = $"{troopData.displayName}_{column}_{row}";
 
-            if (troopData.sprite != null)
+            Sprite tierSprite = troopData.GetSpriteForTier(Tier);
+            if (tierSprite != null)
             {
-                spriteRenderer.sprite = troopData.sprite;
+                spriteRenderer.sprite = SpriteBackgroundCleaner.GetCleanedSprite(tierSprite);
             }
 
             CaptureBaseSpriteSize();
@@ -288,17 +297,36 @@ namespace MergeAndMarch.Gameplay
             attackMotionRoutine = StartCoroutine(AttackMotionRoutine(targetWorldPosition));
         }
 
-        public bool ApplyDamage(float damage)
+        public bool ApplyDamage(float damage, Enemy attacker = null)
         {
             if (!IsCombatActive)
             {
                 return true;
             }
 
-            currentHP = Mathf.Max(0f, currentHP - Mathf.Max(0f, damage));
+            if (attacker != null)
+            {
+                lastAttackerPosition = attacker.transform.position;
+                hasLastAttackerPosition = true;
+            }
+
+            float appliedDamage = Mathf.Max(0f, damage);
+            currentHP = Mathf.Max(0f, currentHP - appliedDamage);
             StartFlash(Color.white, 0.1f);
             UpdateHPBar();
-            return !IsAlive;
+            if (appliedDamage > 0.01f)
+            {
+                DamageNumber.Spawn(transform.position + (Vector3.up * 0.15f), appliedDamage, DamageNumberColor);
+            }
+
+            bool died = !IsAlive;
+            if (died && !deathIndicatorSpawned)
+            {
+                deathIndicatorSpawned = true;
+                SpawnDeathDirectionIndicator();
+            }
+
+            return died;
         }
 
         public void ResetForWaveStart()
@@ -398,20 +426,15 @@ namespace MergeAndMarch.Gameplay
                 return;
             }
 
-            currentSizeMultiplier = config.troopBaseScale;
-            Color tint = baseColor;
+            Sprite tierSprite = Data.GetSpriteForTier(Tier);
+            if (tierSprite != null)
+            {
+                spriteRenderer.sprite = SpriteBackgroundCleaner.GetCleanedSprite(tierSprite);
+                CaptureBaseSpriteSize();
+            }
 
-            if (Tier == 2)
-            {
-                currentSizeMultiplier = config.tierTwoScale;
-                tint = Color.Lerp(baseColor, config.tierTwoTint, 0.25f);
-            }
-            else if (Tier == 3)
-            {
-                currentSizeMultiplier = config.tierThreeScale;
-                tint = Color.Lerp(baseColor, config.tierThreeTint, 0.4f);
-            }
-            spriteRenderer.color = tint;
+            currentSizeMultiplier = ResolveTierVisualScale(config);
+            spriteRenderer.color = Color.white;
             if (mergeHighlightRenderer != null)
             {
                 mergeHighlightRenderer.sprite = spriteRenderer.sprite;
@@ -428,6 +451,25 @@ namespace MergeAndMarch.Gameplay
                 tierGlowRenderer.transform.localPosition = new Vector3(0f, 0f, 0.05f);
             }
             RefreshVisualSize();
+        }
+
+        private float ResolveTierVisualScale(GameConfig config)
+        {
+            float requestedScale = Tier switch
+            {
+                2 => config.tierTwoScale,
+                3 => config.tierThreeScale,
+                _ => config.troopBaseScale
+            };
+
+            Sprite tierOneSprite = Data.GetSpriteForTier(1);
+            Sprite cleanedTierOneSprite = tierOneSprite != null ? SpriteBackgroundCleaner.GetCleanedSprite(tierOneSprite) : null;
+            float referenceSize = cleanedTierOneSprite != null
+                ? Mathf.Max(cleanedTierOneSprite.bounds.size.x, cleanedTierOneSprite.bounds.size.y)
+                : Mathf.Max(baseSpriteSize.x, baseSpriteSize.y);
+            float currentSize = Mathf.Max(0.01f, Mathf.Max(baseSpriteSize.x, baseSpriteSize.y));
+
+            return requestedScale * Mathf.Max(0.01f, referenceSize) / currentSize;
         }
 
         private void RefreshVisualSize()
@@ -645,6 +687,46 @@ namespace MergeAndMarch.Gameplay
             Destroy(explosion);
         }
 
+        private void SpawnDeathDirectionIndicator()
+        {
+            if (!hasLastAttackerPosition)
+            {
+                return;
+            }
+
+            Vector3 direction = lastAttackerPosition - transform.position;
+            if (direction.sqrMagnitude < 0.0001f)
+            {
+                direction = Vector3.up;
+            }
+
+            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+            GameObject arrow = new("DeathDirectionArrow");
+            arrow.transform.position = transform.position + (Vector3.up * 0.12f);
+            arrow.transform.rotation = Quaternion.Euler(0f, 0f, angle);
+            arrow.transform.localScale = Vector3.one;
+
+            Sprite square = GetRuntimeSquareSprite();
+            SpriteRenderer shaft = CreateEffectSprite(arrow.transform, square, DeathArrowColor, 220);
+            shaft.name = "Shaft";
+            shaft.transform.localPosition = new Vector3(0.18f, 0f, 0f);
+            shaft.transform.localScale = new Vector3(0.35f, 0.055f, 1f);
+
+            SpriteRenderer headTop = CreateEffectSprite(arrow.transform, square, DeathArrowColor, 221);
+            headTop.name = "HeadTop";
+            headTop.transform.localPosition = new Vector3(0.39f, 0.055f, 0f);
+            headTop.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+            headTop.transform.localScale = new Vector3(0.17f, 0.055f, 1f);
+
+            SpriteRenderer headBottom = CreateEffectSprite(arrow.transform, square, DeathArrowColor, 221);
+            headBottom.name = "HeadBottom";
+            headBottom.transform.localPosition = new Vector3(0.39f, -0.055f, 0f);
+            headBottom.transform.localRotation = Quaternion.Euler(0f, 0f, -45f);
+            headBottom.transform.localScale = new Vector3(0.17f, 0.055f, 1f);
+
+            arrow.AddComponent<CombatFeedbackFx>().PlayFade(1f);
+        }
+
         private SpriteRenderer CreateEffectSprite(Transform parent, Sprite sprite, Color color, int sortingOrder)
         {
             GameObject effectObject = new("Effect");
@@ -687,6 +769,27 @@ namespace MergeAndMarch.Gameplay
             return runtimeCircleSprite;
         }
 
+        private static Sprite GetRuntimeSquareSprite()
+        {
+            if (runtimeSquareSprite != null)
+            {
+                return runtimeSquareSprite;
+            }
+
+            Texture2D texture = new(16, 16, TextureFormat.RGBA32, false);
+            Color[] pixels = new Color[16 * 16];
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                pixels[i] = Color.white;
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply();
+            runtimeSquareSprite = Sprite.Create(texture, new Rect(0f, 0f, 16f, 16f), new Vector2(0.5f, 0.5f), 100f);
+            runtimeSquareSprite.name = "TroopRuntimeSquare";
+            return runtimeSquareSprite;
+        }
+
         private void CacheComponents()
         {
             if (spriteRenderer == null)
@@ -721,8 +824,20 @@ namespace MergeAndMarch.Gameplay
             }
 
             boxCollider.isTrigger = true;
-            boxCollider.offset = Vector2.zero;
-            boxCollider.size = baseSpriteSize * currentSizeMultiplier * visualSizeBoost * 0.85f;
+            boxCollider.offset = spriteRenderer != null && spriteRenderer.sprite != null
+                ? (Vector2)spriteRenderer.sprite.bounds.center
+                : Vector2.zero;
+
+            float visualScale = Mathf.Max(0.01f, currentSizeMultiplier * visualSizeBoost);
+            Vector2 visualLocalSize = baseSpriteSize * 0.85f;
+            if (currentConfig != null)
+            {
+                float desiredWorldSize = currentConfig.cellSize * 0.78f;
+                Vector2 minimumLocalSize = Vector2.one * (desiredWorldSize / visualScale);
+                visualLocalSize = Vector2.Max(visualLocalSize, minimumLocalSize);
+            }
+
+            boxCollider.size = visualLocalSize;
         }
 
         private void ResolveReadabilityReferences()

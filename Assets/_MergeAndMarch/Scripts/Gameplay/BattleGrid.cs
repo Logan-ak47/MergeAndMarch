@@ -7,12 +7,14 @@ namespace MergeAndMarch.Gameplay
     public class BattleGrid : MonoBehaviour
     {
         private static Sprite runtimeSquareSprite;
+        private static Sprite runtimeBackgroundGradientSprite;
 
         [SerializeField] private GameConfig config;
         [SerializeField] private Transform slotVisualRoot;
         [SerializeField] private Transform laneVisualRoot;
 
         private Troop[,] occupants;
+        private SpriteRenderer[,] slotVisuals;
 
         public GameConfig Config => config;
 
@@ -25,8 +27,16 @@ namespace MergeAndMarch.Gameplay
         private void Start()
         {
             EnsureVisualRoots();
+            EnsureGradientBackground();
+            ResolveExistingSlotVisuals();
             RebuildLaneVisuals();
             RebuildOccupantsFromScene();
+            UpdateSlotVisualVisibility();
+        }
+
+        private void LateUpdate()
+        {
+            UpdateSlotVisualVisibility();
         }
 
         public void SetConfig(GameConfig gameConfig)
@@ -308,6 +318,7 @@ namespace MergeAndMarch.Gameplay
             }
 
             ClearVisualChildren(slotVisualRoot);
+            EnsureOccupantArray();
 
             for (int row = 0; row < config.rows; row++)
             {
@@ -323,6 +334,7 @@ namespace MergeAndMarch.Gameplay
                     renderer.color = config.slotTint;
                     renderer.sortingLayerName = "Grid";
                     renderer.sortingOrder = 0;
+                    slotVisuals[column, row] = renderer;
                 }
             }
         }
@@ -349,22 +361,29 @@ namespace MergeAndMarch.Gameplay
             float lineHeight = Mathf.Max(0.5f, lineTop - lineBottom);
             float lineWidth = Mathf.Max(0.04f, config.cellSize * config.laneGuideWidthScale);
             float markerSize = Mathf.Max(0.08f, config.cellSize * config.laneGuideMarkerScale);
-            float lineCenterY = lineBottom + (lineHeight * 0.5f);
+            const int segmentCount = 3;
 
             for (int column = 0; column < config.columns; column++)
             {
                 Vector3 laneCenter = GetSlotWorldPosition(column, 0);
 
-                GameObject line = new($"LaneGuide_{column}");
-                line.transform.SetParent(laneVisualRoot, false);
-                line.transform.position = new Vector3(laneCenter.x, lineCenterY, 0f);
-                line.transform.localScale = new Vector3(lineWidth, lineHeight, 1f);
+                for (int segment = 0; segment < segmentCount; segment++)
+                {
+                    float segmentHeight = lineHeight / segmentCount;
+                    float segmentCenterY = lineBottom + (segmentHeight * (segment + 0.5f));
+                    float fade = 1f - (segment * 0.28f);
 
-                SpriteRenderer lineRenderer = line.AddComponent<SpriteRenderer>();
-                lineRenderer.sprite = sprite;
-                lineRenderer.color = config.laneGuideTint;
-                lineRenderer.sortingLayerName = "Grid";
-                lineRenderer.sortingOrder = -2;
+                    GameObject line = new($"LaneGuide_{column}_{segment}");
+                    line.transform.SetParent(laneVisualRoot, false);
+                    line.transform.position = new Vector3(laneCenter.x, segmentCenterY, 0f);
+                    line.transform.localScale = new Vector3(lineWidth, segmentHeight * 0.92f, 1f);
+
+                    SpriteRenderer lineRenderer = line.AddComponent<SpriteRenderer>();
+                    lineRenderer.sprite = sprite;
+                    lineRenderer.color = WithAlpha(config.laneGuideTint, config.laneGuideTint.a * fade);
+                    lineRenderer.sortingLayerName = "Grid";
+                    lineRenderer.sortingOrder = -2;
+                }
 
                 GameObject marker = new($"LaneMarker_{column}");
                 marker.transform.SetParent(laneVisualRoot, false);
@@ -373,7 +392,7 @@ namespace MergeAndMarch.Gameplay
 
                 SpriteRenderer markerRenderer = marker.AddComponent<SpriteRenderer>();
                 markerRenderer.sprite = sprite;
-                markerRenderer.color = config.laneGuideMarkerTint;
+                markerRenderer.color = WithAlpha(config.laneGuideMarkerTint, config.laneGuideMarkerTint.a * 0.7f);
                 markerRenderer.sortingLayerName = "Grid";
                 markerRenderer.sortingOrder = -1;
             }
@@ -391,6 +410,77 @@ namespace MergeAndMarch.Gameplay
             Gizmos.DrawWireCube(bounds.center, bounds.size);
         }
 
+        private void EnsureGradientBackground()
+        {
+            Camera camera = Camera.main;
+            if (camera == null)
+            {
+                return;
+            }
+
+            const string backgroundName = "RuntimeGradientBackground";
+            Transform existing = camera.transform.Find(backgroundName);
+            SpriteRenderer backgroundRenderer = existing != null ? existing.GetComponent<SpriteRenderer>() : null;
+            if (backgroundRenderer == null)
+            {
+                GameObject background = new(backgroundName);
+                background.transform.SetParent(camera.transform, false);
+                backgroundRenderer = background.AddComponent<SpriteRenderer>();
+            }
+
+            float height = camera.orthographicSize * 2f;
+            float width = height * camera.aspect;
+            backgroundRenderer.sprite = GetRuntimeBackgroundGradientSprite();
+            backgroundRenderer.color = Color.white;
+            backgroundRenderer.sortingLayerName = "Background";
+            backgroundRenderer.sortingOrder = -100;
+            backgroundRenderer.transform.localPosition = new Vector3(0f, 0f, 20f);
+            backgroundRenderer.transform.localScale = new Vector3(width, height, 1f);
+        }
+
+        private void UpdateSlotVisualVisibility()
+        {
+            if (config == null || slotVisuals == null || occupants == null)
+            {
+                return;
+            }
+
+            for (int column = 0; column < config.columns; column++)
+            {
+                for (int row = 0; row < config.rows; row++)
+                {
+                    SpriteRenderer renderer = slotVisuals[column, row];
+                    if (renderer == null)
+                    {
+                        continue;
+                    }
+
+                    renderer.enabled = occupants[column, row] == null;
+                }
+            }
+        }
+
+        private void ResolveExistingSlotVisuals()
+        {
+            if (config == null || slotVisualRoot == null)
+            {
+                return;
+            }
+
+            EnsureOccupantArray();
+            for (int column = 0; column < config.columns; column++)
+            {
+                for (int row = 0; row < config.rows; row++)
+                {
+                    Transform child = slotVisualRoot.Find($"Slot_{column}_{row}");
+                    if (child != null)
+                    {
+                        slotVisuals[column, row] = child.GetComponent<SpriteRenderer>();
+                    }
+                }
+            }
+        }
+
         private void EnsureOccupantArray()
         {
             if (config == null)
@@ -401,6 +491,11 @@ namespace MergeAndMarch.Gameplay
             if (occupants == null || occupants.GetLength(0) != config.columns || occupants.GetLength(1) != config.rows)
             {
                 occupants = new Troop[config.columns, config.rows];
+            }
+
+            if (slotVisuals == null || slotVisuals.GetLength(0) != config.columns || slotVisuals.GetLength(1) != config.rows)
+            {
+                slotVisuals = new SpriteRenderer[config.columns, config.rows];
             }
         }
 
@@ -471,6 +566,35 @@ namespace MergeAndMarch.Gameplay
             runtimeSquareSprite = Sprite.Create(texture, new Rect(0f, 0f, 16f, 16f), new Vector2(0.5f, 0.5f), 100f);
             runtimeSquareSprite.name = "BattleGridRuntimeSquare";
             return runtimeSquareSprite;
+        }
+
+        private static Sprite GetRuntimeBackgroundGradientSprite()
+        {
+            if (runtimeBackgroundGradientSprite != null)
+            {
+                return runtimeBackgroundGradientSprite;
+            }
+
+            const int height = 512;
+            Texture2D texture = new(1, height, TextureFormat.RGBA32, false);
+            Color top = new(0.051f, 0.051f, 0.102f, 1f);
+            Color bottom = new(0.122f, 0.122f, 0.208f, 1f);
+            for (int y = 0; y < height; y++)
+            {
+                float t = y / (height - 1f);
+                texture.SetPixel(0, y, Color.Lerp(bottom, top, t));
+            }
+
+            texture.Apply();
+            runtimeBackgroundGradientSprite = Sprite.Create(texture, new Rect(0f, 0f, 1f, height), new Vector2(0.5f, 0.5f), height);
+            runtimeBackgroundGradientSprite.name = "RuntimeBackgroundGradient";
+            return runtimeBackgroundGradientSprite;
+        }
+
+        private static Color WithAlpha(Color color, float alpha)
+        {
+            color.a = alpha;
+            return color;
         }
     }
 }

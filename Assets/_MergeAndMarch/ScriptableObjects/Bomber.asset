@@ -18,5 +18,10 @@ MonoBehaviour:
   baseHP: 20
   baseAttack: 80
   attackInterval: 999
+  targeting: 4
   supportPower: 0
-  sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
+  tierSprites:
+  - {fileID: 21300000, guid: cdcbaa4a86157d742bbddb1a9baf9543, type: 3}
+  - {fileID: 21300000, guid: cc236503646ac63489b7c4e770dcf0eb, type: 3}
+  - {fileID: 21300000, guid: 45f6bc452b1409048bcb0c93eb6701ab, type: 3}
+  sprite: {fileID: 21300000, guid: cdcbaa4a86157d742bbddb1a9baf9543, type: 3}

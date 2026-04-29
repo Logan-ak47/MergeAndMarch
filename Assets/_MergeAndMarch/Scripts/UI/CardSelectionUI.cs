@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using MergeAndMarch.Data;
 using TMPro;
 using UnityEngine;
@@ -14,6 +15,7 @@ namespace MergeAndMarch.UI
         [SerializeField] private GameObject parentPanel;
 
         private Action<int> onCardSelected;
+        private Coroutine entranceRoutine;
 
         public bool IsVisible => parentPanel != null && parentPanel.activeSelf;
 
@@ -52,6 +54,13 @@ namespace MergeAndMarch.UI
                 cardObject.SetActive(true);
                 ConfigureCard(cardObject, threeCards[i], i);
             }
+
+            if (entranceRoutine != null)
+            {
+                StopCoroutine(entranceRoutine);
+            }
+
+            entranceRoutine = StartCoroutine(PlayEntranceRoutine());
         }
 
         public void Hide()
@@ -67,7 +76,7 @@ namespace MergeAndMarch.UI
             Image background = cardObject.GetComponent<Image>();
             if (background != null)
             {
-                background.color = card.cardColor;
+                background.color = new Color(0.96f, 0.95f, 0.9f, 1f);
             }
 
             Button button = cardObject.GetComponent<Button>();
@@ -81,18 +90,90 @@ namespace MergeAndMarch.UI
             if (title != null)
             {
                 title.text = card.cardName;
+                title.color = Color.white;
+                title.enableAutoSizing = true;
+                title.fontSizeMin = 16f;
+                title.fontSizeMax = 24f;
+                title.margin = Vector4.zero;
             }
 
             TextMeshProUGUI description = cardObject.transform.Find("Description")?.GetComponent<TextMeshProUGUI>();
             if (description != null)
             {
                 description.text = card.description;
+                description.color = new Color(0.13f, 0.12f, 0.16f, 1f);
+                description.enableAutoSizing = true;
+                description.fontSizeMin = 16f;
+                description.fontSizeMax = 22f;
+                description.margin = new Vector4(8f, 0f, 8f, 0f);
             }
 
-            TextMeshProUGUI rarity = cardObject.transform.Find("Rarity")?.GetComponent<TextMeshProUGUI>();
-            if (rarity != null)
+            Image header = cardObject.transform.Find("Header")?.GetComponent<Image>();
+            if (header != null)
             {
-                rarity.text = card.rarity.ToString();
+                header.color = card.cardColor;
+            }
+
+            TextMeshProUGUI icon = cardObject.transform.Find("Icon")?.GetComponent<TextMeshProUGUI>();
+            if (icon != null)
+            {
+                icon.text = GetCategoryIconText(card.category);
+                icon.color = Color.white;
+                icon.enableAutoSizing = true;
+                icon.fontSizeMin = 10f;
+                icon.fontSizeMax = 16f;
+            }
+
+            ConfigureRarityGems(cardObject.transform, card.rarity);
+        }
+
+        private IEnumerator PlayEntranceRoutine()
+        {
+            const float duration = 0.34f;
+            const float stagger = 0.07f;
+            RectTransform[] cards = new RectTransform[3];
+            Vector2[] endPositions = new Vector2[3];
+            Vector2[] startPositions = new Vector2[3];
+
+            for (int i = 0; i < cards.Length; i++)
+            {
+                cards[i] = parentPanel.transform.Find($"Card_{i}")?.GetComponent<RectTransform>();
+                if (cards[i] == null || !cards[i].gameObject.activeSelf)
+                {
+                    continue;
+                }
+
+                endPositions[i] = new Vector2((i - 1) * 340f, 0f);
+                startPositions[i] = endPositions[i] + new Vector2(0f, -520f);
+                cards[i].anchoredPosition = startPositions[i];
+            }
+
+            float elapsed = 0f;
+            float totalDuration = duration + (stagger * 2f);
+            while (elapsed < totalDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                for (int i = 0; i < cards.Length; i++)
+                {
+                    if (cards[i] == null || !cards[i].gameObject.activeSelf)
+                    {
+                        continue;
+                    }
+
+                    float t = Mathf.Clamp01((elapsed - (i * stagger)) / duration);
+                    float eased = Mathf.Sin(t * Mathf.PI * 0.5f) * 1.08f - Mathf.Max(0f, t * 0.08f);
+                    cards[i].anchoredPosition = Vector2.LerpUnclamped(startPositions[i], endPositions[i], eased);
+                }
+
+                yield return null;
+            }
+
+            for (int i = 0; i < cards.Length; i++)
+            {
+                if (cards[i] != null)
+                {
+                    cards[i].anchoredPosition = endPositions[i];
+                }
             }
         }
 
@@ -100,6 +181,11 @@ namespace MergeAndMarch.UI
         {
             if (parentPanel != null)
             {
+                for (int i = 0; i < 3; i++)
+                {
+                    CreateCard(parentPanel.transform, i);
+                }
+
                 return;
             }
 
@@ -129,10 +215,16 @@ namespace MergeAndMarch.UI
 
         private void CreateCard(Transform parent, int index)
         {
-            GameObject cardObject = new($"Card_{index}", typeof(RectTransform), typeof(Image), typeof(Button));
+            Transform existing = parent.Find($"Card_{index}");
+            GameObject cardObject = existing != null ? existing.gameObject : new GameObject($"Card_{index}", typeof(RectTransform), typeof(Image), typeof(Button));
             cardObject.transform.SetParent(parent, false);
 
             RectTransform rect = cardObject.GetComponent<RectTransform>();
+            if (rect == null)
+            {
+                rect = cardObject.AddComponent<RectTransform>();
+            }
+
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
@@ -140,27 +232,79 @@ namespace MergeAndMarch.UI
             rect.anchoredPosition = new Vector2((index - 1) * 340f, 0f);
 
             Image background = cardObject.GetComponent<Image>();
+            if (background == null)
+            {
+                background = cardObject.AddComponent<Image>();
+            }
+
             background.color = Color.white;
             background.raycastTarget = true;
 
             Button button = cardObject.GetComponent<Button>();
+            if (button == null)
+            {
+                button = cardObject.AddComponent<Button>();
+            }
+
             ColorBlock colors = button.colors;
             colors.normalColor = Color.white;
             colors.highlightedColor = new Color(1f, 1f, 1f, 0.92f);
             colors.pressedColor = new Color(0.9f, 0.9f, 0.9f, 0.92f);
             button.colors = colors;
 
-            CreateText(cardObject.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -46f), new Vector2(250f, 60f), 30, FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText(cardObject.transform, "Description", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 0f), new Vector2(240f, 170f), 22, FontStyles.Normal, TextAlignmentOptions.Center);
-            CreateText(cardObject.transform, "Rarity", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 36f), new Vector2(220f, 40f), 20, FontStyles.Normal, TextAlignmentOptions.Center);
+            CreateCardPanel(cardObject.transform, "Header", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -38f), new Vector2(0f, 76f), Color.white);
+            CreateCardPanel(cardObject.transform, "Badge", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0.5f, 0.5f), new Vector2(44f, -38f), new Vector2(56f, 32f), new Color(0f, 0f, 0f, 0.18f));
+            CreateText(cardObject.transform, "Icon", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(44f, -38f), new Vector2(56f, 30f), 16, FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(cardObject.transform, "Title", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(38f, -38f), new Vector2(-104f, 46f), 24, FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(cardObject.transform, "Description", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -12f), new Vector2(238f, 182f), 22, FontStyles.Normal, TextAlignmentOptions.Center);
+
+            for (int i = 0; i < 3; i++)
+            {
+                CreateCardPanel(cardObject.transform, $"Gem_{i}", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f), new Vector2((i - 1) * 28f, 34f), new Vector2(18f, 18f), Color.gray);
+            }
+        }
+
+        private Image CreateCardPanel(Transform parent, string objectName, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition, Vector2 size, Color color)
+        {
+            Transform existing = parent.Find(objectName);
+            GameObject panelObject = existing != null ? existing.gameObject : new GameObject(objectName, typeof(RectTransform), typeof(Image));
+            panelObject.transform.SetParent(parent, false);
+
+            RectTransform rect = panelObject.GetComponent<RectTransform>();
+            if (rect == null)
+            {
+                rect = panelObject.AddComponent<RectTransform>();
+            }
+
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.pivot = pivot;
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = size;
+
+            Image image = panelObject.GetComponent<Image>();
+            if (image == null)
+            {
+                image = panelObject.AddComponent<Image>();
+            }
+
+            image.color = color;
+            image.raycastTarget = false;
+            return image;
         }
 
         private void CreateText(Transform parent, string objectName, Vector2 anchorMin, Vector2 anchorMax, Vector2 anchoredPosition, Vector2 size, float fontSize, FontStyles fontStyle, TextAlignmentOptions alignment)
         {
-            GameObject textObject = new(objectName, typeof(RectTransform), typeof(TextMeshProUGUI));
+            Transform existing = parent.Find(objectName);
+            GameObject textObject = existing != null ? existing.gameObject : new GameObject(objectName, typeof(RectTransform), typeof(TextMeshProUGUI));
             textObject.transform.SetParent(parent, false);
 
             RectTransform rect = textObject.GetComponent<RectTransform>();
+            if (rect == null)
+            {
+                rect = textObject.AddComponent<RectTransform>();
+            }
+
             rect.anchorMin = anchorMin;
             rect.anchorMax = anchorMax;
             rect.pivot = new Vector2(0.5f, 0.5f);
@@ -168,13 +312,65 @@ namespace MergeAndMarch.UI
             rect.sizeDelta = size;
 
             TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
+            if (text == null)
+            {
+                text = textObject.AddComponent<TextMeshProUGUI>();
+            }
+
             text.font = TMP_Settings.defaultFontAsset;
             text.fontSize = fontSize;
             text.fontStyle = fontStyle;
             text.alignment = alignment;
             text.color = Color.white;
-            text.enableWordWrapping = true;
+            text.outlineColor = Color.black;
+            text.outlineWidth = fontStyle == FontStyles.Bold ? 0.08f : 0f;
+            text.textWrappingMode = TextWrappingModes.Normal;
+            text.overflowMode = TextOverflowModes.Ellipsis;
             text.text = string.Empty;
+        }
+
+        private void ConfigureRarityGems(Transform cardTransform, CardRarity rarity)
+        {
+            int visibleCount = rarity switch
+            {
+                CardRarity.Rare => 2,
+                CardRarity.Epic => 3,
+                _ => 1
+            };
+
+            Color gemColor = rarity switch
+            {
+                CardRarity.Rare => new Color(0.22f, 0.58f, 1f, 1f),
+                CardRarity.Epic => new Color(0.68f, 0.3f, 1f, 1f),
+                _ => new Color(0.55f, 0.58f, 0.62f, 1f)
+            };
+
+            for (int i = 0; i < 3; i++)
+            {
+                Image gem = cardTransform.Find($"Gem_{i}")?.GetComponent<Image>();
+                if (gem == null)
+                {
+                    continue;
+                }
+
+                gem.gameObject.SetActive(i < visibleCount);
+                gem.color = gemColor;
+            }
+        }
+
+        private string GetCategoryIconText(CardCategory category)
+        {
+            return category switch
+            {
+                CardCategory.StatBoost => "ATK",
+                CardCategory.Spawn => "+",
+                CardCategory.MergeBoost => "UP",
+                CardCategory.Heal => "HP",
+                CardCategory.Special => "*",
+                CardCategory.Economy => "$",
+                CardCategory.Deployment => "DEF",
+                _ => "?"
+            };
         }
 
         private void ResolveCanvas()

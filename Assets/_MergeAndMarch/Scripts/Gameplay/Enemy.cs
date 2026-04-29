@@ -12,6 +12,7 @@ namespace MergeAndMarch.Gameplay
     {
         private static readonly List<Enemy> activeEnemyBuffer = new();
         private static Sprite fallbackSprite;
+        private static Sprite runtimeSquareSprite;
         private static readonly Color HpBarFillColor = new(1f, 0.2667f, 0.2667f, 1f);
 
         private readonly List<Troop> troopBuffer = new();
@@ -100,9 +101,10 @@ namespace MergeAndMarch.Gameplay
 
             attackTimer = Data.attackInterval;
             StartFlash(Color.Lerp(Data.tintColor, Color.white, 0.35f), 0.08f);
-            StartAttackPulse();
+            StartAttackPulse(blockingTroop.transform.position);
+            SpawnAttackImpact(blockingTroop);
 
-            bool troopDied = blockingTroop.ApplyDamage(attackDamage);
+            bool troopDied = blockingTroop.ApplyDamage(attackDamage, this);
             ApplyKnightThorns(blockingTroop);
             if (troopDied)
             {
@@ -114,12 +116,15 @@ namespace MergeAndMarch.Gameplay
         private bool TryTriggerBomberInRowZone()
         {
             battleGrid.GetTroops(troopBuffer);
-            float rowZoneHalfHeight = gameConfig.cellSize * 0.5f;
+            float triggerReach = Mathf.Max(0.05f, gameConfig.bomberTriggerReach);
 
             for (int i = 0; i < troopBuffer.Count; i++)
             {
                 Troop troop = troopBuffer[i];
-                if (troop == null || !troop.IsSingleUse || troop.HasExplodedThisWave)
+                if (troop == null
+                    || !troop.IsSingleUse
+                    || troop.HasExplodedThisWave
+                    || troop.Column != LaneColumn)
                 {
                     continue;
                 }
@@ -129,7 +134,8 @@ namespace MergeAndMarch.Gameplay
                     continue;
                 }
 
-                if (Mathf.Abs(transform.position.y - troop.transform.position.y) > rowZoneHalfHeight)
+                float distanceToTroop = transform.position.y - troop.transform.position.y;
+                if (distanceToTroop < -0.05f || distanceToTroop > triggerReach)
                 {
                     continue;
                 }
@@ -158,7 +164,7 @@ namespace MergeAndMarch.Gameplay
             gameConfig = config;
             battleGrid = grid;
             owner = enemySpawner;
-            LaneColumn = laneColumn;
+            LaneColumn = config != null ? Mathf.Clamp(laneColumn, 0, Mathf.Max(0, config.columns - 1)) : laneColumn;
             failY = failLineY;
             isDying = false;
             hasEscaped = false;
@@ -167,16 +173,17 @@ namespace MergeAndMarch.Gameplay
             attackDamage = Data != null ? Data.baseAttack * Mathf.Max(0.01f, attackMultiplier) : 0f;
             moveSpeed = Data != null ? Data.moveSpeed * Mathf.Max(0.01f, moveSpeedMultiplier) : 0f;
             attackTimer = Random.Range(0f, Mathf.Max(0.05f, Data != null ? Data.attackInterval * 0.5f : 0.25f));
-            lanePosition = transform.position;
 
-            name = Data != null ? $"{Data.displayName}_{laneColumn}" : "Enemy";
+            name = Data != null ? $"{Data.displayName}_{LaneColumn}" : "Enemy";
             Vector3 visualSpawnPos = spawnPosition + new Vector3(0f, Data != null ? Data.renderYOffset : 0f, 0f);
             transform.position = visualSpawnPos;
+            lanePosition = transform.position;
 
             if (spriteRenderer != null && Data != null)
             {
-                spriteRenderer.sprite = Data.sprite != null ? Data.sprite : GetFallbackSprite();
-                spriteRenderer.color = Data.tintColor;
+                bool hasArtSprite = Data.sprite != null;
+                spriteRenderer.sprite = hasArtSprite ? SpriteBackgroundCleaner.GetCleanedSprite(Data.sprite) : GetFallbackSprite();
+                spriteRenderer.color = hasArtSprite ? Color.white : Data.tintColor;
                 spriteRenderer.drawMode = SpriteDrawMode.Simple;
                 spriteRenderer.size = Vector2.one;
                 spriteRenderer.sortingLayerName = "Enemies";
@@ -251,7 +258,6 @@ namespace MergeAndMarch.Gameplay
 
             Troop best = null;
             float bestY = float.NegativeInfinity;
-            float engageY = transform.position.y - gameConfig.enemyEngageDistance;
 
             for (int i = 0; i < troopBuffer.Count; i++)
             {
@@ -266,12 +272,13 @@ namespace MergeAndMarch.Gameplay
                     continue;
                 }
 
-                float troopY = troop.transform.position.y;
-                if (troopY > engageY)
+                float distanceToTroop = transform.position.y - troop.transform.position.y;
+                if (distanceToTroop < -0.05f || distanceToTroop > gameConfig.enemyEngageDistance)
                 {
                     continue;
                 }
 
+                float troopY = troop.transform.position.y;
                 if (troopY > bestY)
                 {
                     best = troop;
@@ -313,14 +320,14 @@ namespace MergeAndMarch.Gameplay
             flashRoutine = StartCoroutine(FlashRoutine(flashColor, duration));
         }
 
-        private void StartAttackPulse()
+        private void StartAttackPulse(Vector3 targetPosition)
         {
             if (attackPulseRoutine != null)
             {
                 StopCoroutine(attackPulseRoutine);
             }
 
-            attackPulseRoutine = StartCoroutine(AttackPulseRoutine());
+            attackPulseRoutine = StartCoroutine(AttackPulseRoutine(targetPosition));
         }
 
         private void StartDeathSequence()
@@ -349,6 +356,58 @@ namespace MergeAndMarch.Gameplay
             deathRoutine = StartCoroutine(DeathRoutine());
         }
 
+        private void SpawnAttackImpact(Troop target)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            bool isFlyer = Data != null && Data.skipsFrontline;
+            GameObject impact = new(isFlyer ? "FlyerSlashImpact" : "EnemyMeleeImpact");
+            impact.transform.position = target.transform.position + (Vector3.up * 0.12f);
+            impact.transform.localScale = isFlyer ? Vector3.one * 1.05f : Vector3.one * 0.75f;
+
+            Sprite square = GetRuntimeSquareSprite();
+            Color color = isFlyer
+                ? new Color(0.58f, 1f, 1f, 0.95f)
+                : new Color(1f, 0.45f, 0.22f, 0.85f);
+
+            if (isFlyer)
+            {
+                SpriteRenderer slashA = CreateImpactSprite(impact.transform, "SlashA", square, color, 210);
+                slashA.transform.localRotation = Quaternion.Euler(0f, 0f, 35f);
+                slashA.transform.localScale = new Vector3(0.52f, 0.055f, 1f);
+
+                SpriteRenderer slashB = CreateImpactSprite(impact.transform, "SlashB", square, Color.white, 211);
+                slashB.transform.localRotation = Quaternion.Euler(0f, 0f, -35f);
+                slashB.transform.localScale = new Vector3(0.38f, 0.045f, 1f);
+            }
+            else
+            {
+                SpriteRenderer horizontal = CreateImpactSprite(impact.transform, "Horizontal", square, color, 210);
+                horizontal.transform.localScale = new Vector3(0.28f, 0.06f, 1f);
+
+                SpriteRenderer vertical = CreateImpactSprite(impact.transform, "Vertical", square, color, 210);
+                vertical.transform.localScale = new Vector3(0.06f, 0.28f, 1f);
+            }
+
+            impact.AddComponent<CombatFeedbackFx>().PlayFade(isFlyer ? 0.3f : 0.22f);
+        }
+
+        private SpriteRenderer CreateImpactSprite(Transform parent, string name, Sprite sprite, Color color, int sortingOrder)
+        {
+            GameObject effectObject = new(name);
+            effectObject.transform.SetParent(parent, false);
+
+            SpriteRenderer renderer = effectObject.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.color = color;
+            renderer.sortingLayerName = "Effects";
+            renderer.sortingOrder = sortingOrder;
+            return renderer;
+        }
+
         private IEnumerator FlashRoutine(Color flashColor, float duration)
         {
             Color original = spriteRenderer.color;
@@ -368,10 +427,16 @@ namespace MergeAndMarch.Gameplay
             flashRoutine = null;
         }
 
-        private IEnumerator AttackPulseRoutine()
+        private IEnumerator AttackPulseRoutine(Vector3 targetPosition)
         {
             Vector3 start = lanePosition;
-            Vector3 pulseTarget = start + (Vector3.down * 0.14f);
+            Vector3 direction = targetPosition - start;
+            if (direction.sqrMagnitude < 0.0001f)
+            {
+                direction = Vector3.down;
+            }
+
+            Vector3 pulseTarget = start + (direction.normalized * 0.18f);
             float forwardDuration = 0.06f;
             float returnDuration = 0.08f;
             float elapsed = 0f;
@@ -457,6 +522,27 @@ namespace MergeAndMarch.Gameplay
             fallbackSprite = Sprite.Create(texture, new Rect(0f, 0f, 16f, 16f), new Vector2(0.5f, 0.5f), 100f);
             fallbackSprite.name = "EnemyFallbackSprite";
             return fallbackSprite;
+        }
+
+        private static Sprite GetRuntimeSquareSprite()
+        {
+            if (runtimeSquareSprite != null)
+            {
+                return runtimeSquareSprite;
+            }
+
+            Texture2D texture = new(16, 16, TextureFormat.RGBA32, false);
+            Color[] pixels = new Color[16 * 16];
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                pixels[i] = Color.white;
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply();
+            runtimeSquareSprite = Sprite.Create(texture, new Rect(0f, 0f, 16f, 16f), new Vector2(0.5f, 0.5f), 100f);
+            runtimeSquareSprite.name = "EnemyRuntimeSquare";
+            return runtimeSquareSprite;
         }
 
         private void CacheComponents()

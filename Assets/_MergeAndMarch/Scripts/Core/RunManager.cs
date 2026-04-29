@@ -106,14 +106,14 @@ namespace MergeAndMarch.Core
                 Destroy(child.gameObject);
             }
 
-            int leftCenterColumn = Mathf.Max(0, (gameConfig.columns / 2) - 1);
-            int rightCenterColumn = Mathf.Min(gameConfig.columns - 1, leftCenterColumn + 1);
-
             ConfigureStartingComposition();
-            SpawnTroop(GetTroopData(startingLineupComposition[0]), leftCenterColumn, 0);
-            SpawnTroop(GetTroopData(startingLineupComposition[1]), rightCenterColumn, 0);
-            SpawnTroop(GetTroopData(startingLineupComposition[2]), leftCenterColumn, 1);
-            SpawnTroop(GetTroopData(startingLineupComposition[3]), rightCenterColumn, 1);
+            for (int i = 0; i < startingLineupComposition.Length; i++)
+            {
+                TroopType troopType = startingLineupComposition[i];
+                int column = GetDistributedStartingColumn(i);
+                int row = GetStartingRow(troopType);
+                SpawnTroop(GetTroopData(troopType), column, row);
+            }
         }
 
         public Troop SpawnTroop(TroopData troopData, int column, int row, int tier = 1)
@@ -166,11 +166,29 @@ namespace MergeAndMarch.Core
                     break;
                 default:
                     startingLineupComposition[0] = TroopType.Knight;
-                    startingLineupComposition[1] = TroopType.Knight;
-                    startingLineupComposition[2] = TroopType.Archer;
+                    startingLineupComposition[1] = TroopType.Archer;
+                    startingLineupComposition[2] = TroopType.Knight;
                     startingLineupComposition[3] = TroopType.Archer;
                     break;
             }
+        }
+
+        private int GetDistributedStartingColumn(int lineupIndex)
+        {
+            int maxColumn = Mathf.Max(0, gameConfig.columns - 1);
+            if (startingLineupComposition.Length <= 1)
+            {
+                return 0;
+            }
+
+            float t = lineupIndex / (float)(startingLineupComposition.Length - 1);
+            return Mathf.Clamp(Mathf.RoundToInt(maxColumn * t), 0, maxColumn);
+        }
+
+        private int GetStartingRow(TroopType troopType)
+        {
+            int preferredRow = troopType == TroopType.Knight || troopType == TroopType.Bomber ? 0 : 1;
+            return Mathf.Clamp(preferredRow, 0, Mathf.Max(0, gameConfig.rows - 1));
         }
 
         private WaveManager EnsureWaveManager()

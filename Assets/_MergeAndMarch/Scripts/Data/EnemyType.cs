@@ -5,6 +5,7 @@ namespace MergeAndMarch.Data
         Grunt = 0,
         Rusher = 1,
         Tank = 2,
-        Flyer = 3
+        Flyer = 3,
+        Boss = 4
     }
 }

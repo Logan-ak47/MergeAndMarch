@@ -19,4 +19,7 @@ MonoBehaviour:
   baseAttack: 8
   moveSpeed: 1.5
   attackInterval: 1.5
-  sprite: {fileID: 0}
+  sizeScale: 1
+  skipsFrontline: 0
+  renderYOffset: 0
+  sprite: {fileID: 21300000, guid: f1c5ce90c2160fb4ca8cec809229aedd, type: 3}

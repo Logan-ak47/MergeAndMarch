@@ -10,16 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9f6d074dcb5dc9b4d8b82e56bece2e74, type: 3}
-  m_Name: Flyer
+  m_Name: Boss
   m_EditorClassIdentifier: Assembly-CSharp::MergeAndMarch.Data.EnemyData
-  enemyType: 3
-  displayName: Flyer
-  tintColor: {r: 0.302, g: 0.867, b: 1, a: 1}
-  baseHP: 25
-  baseAttack: 10
-  moveSpeed: 2
-  attackInterval: 1.2
-  sizeScale: 1
-  skipsFrontline: 1
-  renderYOffset: 0.3
-  sprite: {fileID: 21300000, guid: 4ceb4d0d708bf4844a9646e214c99ce4, type: 3}
+  enemyType: 4
+  displayName: Boss
+  tintColor: {r: 1, g: 0.72, b: 0.18, a: 1}
+  baseHP: 30
+  baseAttack: 8
+  moveSpeed: 1.25
+  attackInterval: 1.5
+  sizeScale: 1.4
+  skipsFrontline: 0
+  renderYOffset: 0
+  sprite: {fileID: 21300000, guid: dd2f45eed5f1ddf4f995dedcf9b830b6, type: 3}

@@ -7,10 +7,10 @@
 ## PROJECT STATUS
 
 **Current Phase:** Phase 2 - Roguelike Cards + Readability + Enemy Variety
-**Session Count:** 10
-**Last Session Date:** 2026-04-23
-**Last Session Summary:** Session 10 focused on the merge moment so short gameplay clips read as a cared-about hybrid-casual prototype instead of a raw placeholder. `MergeController` now runs a stronger three-beat merge sequence: both source troops flash white, a troop-colored particle burst fires at the merge point, the result troop pops in with a bouncy overshoot, and the camera gets a subtle shake. DOTween is still not present in `Packages/manifest.json`, so the pop/shake are implemented with unscaled coroutine animation to keep the project compiling. A runtime particle fallback was added so the burst works even before a prefab is wired. The requested baseline clip capture still needs to be recorded manually.
-**Next Task:** Session 11: continue the clip-readiness pass, wire a dedicated `MergeBurstFX` prefab if desired, and capture before/after gameplay footage for honest public-facing A/B comparison.
+**Session Count:** 13
+**Last Session Date:** 2026-04-28
+**Last Session Summary:** Session 13 addressed lane coverage and invisible troop deaths. The starting lineup now distributes one troop per column in the default Knight/Archer pattern, and Knights can target enemies in their own and adjacent columns while still preferring own-column targets on equal distance. Troops now show red floating damage numbers when hit, enemy attacks now spawn visible hit FX (cyan flyer slash for Flyers, compact melee impact for Grunt/Tank/Rusher-style attackers), and troop deaths spawn a red one-second direction arrow toward the cached last attacker position. Runtime and editor assemblies build cleanly with zero warnings.
+**Next Task:** Open Unity, let assets reimport, do a hands-on Play Mode validation pass for Session 13 readability: distributed start, adjacent Knight coverage, flyer slash on Mage/Healer hits, red troop damage numbers, melee impact FX, and death arrows. If those pass, record the requested fresh 60-second clip showing combat readability improvements. Font replacement and actual Recorder/OBS capture are still manual pending items.
 
 ---
 
@@ -153,14 +153,14 @@ Assets/_MergeAndMarch/
 - Battle layout is still **portrait-only for prototype purposes**.
 - Grid is centered horizontally and anchored near the bottom of the screen.
 - Enemies enter from the **top** and move downward.
-- Starting lineup uses the **center two columns**, not the outer columns.
+- Starting lineup distributes the four default troops across all four columns: Knight, Archer, Knight, Archer.
 - Current tuning in `GameConfig`:
   - `cellSize = 1.15`
   - `gridOffset = (-1.725, -3.6)`
-  - `troopBaseScale = 3.6`
-  - `tierTwoScale = 4.3`
-  - `tierThreeScale = 5.0`
-  - `enemyBaseScale = 3.2`
+  - `troopBaseScale = 0.1`
+  - `tierTwoScale = 0.115`
+  - `tierThreeScale = 0.13`
+  - `enemyBaseScale = 0.1`
   - `laneGuideHeight = 5.8`
   - `laneGuideWidthScale = 0.1`
   - `laneGuideMarkerScale = 0.16`
@@ -181,15 +181,18 @@ Assets/_MergeAndMarch/
 - Merge highlighting is now working consistently in play: valid targets pulse, non-valid troops dim, and the earlier "sometimes nothing happens" merge-feedback issue does not appear to be reproducing after the Session 9 fix pass.
 - `MergeController` now gives merges a clearer mini-cutscene: source troops flash white, a troop-colored merge burst fires at the destination, the upgraded troop pops in with a stronger overshoot, and the camera gets a subtle shake. This is coroutine-driven for now because DOTween is still not installed in the project manifest.
 - `AutoCombat` now routes troop actions through explicit targeting types: ranged/melee attacks, Mage AoE bands, and Healer support pulses. Bomber triggering is handled by enemy row contact instead of the normal combat tick.
-- `Enemy` now handles Bomber row-contact triggering, still applies Knight thorns when appropriate, and spawns floating damage numbers for each damage instance.
+- `Enemy` now handles Bomber row-contact triggering, still applies Knight thorns when appropriate, spawns floating damage numbers for each damage instance, and shows attack impact FX when damaging troops.
+- Enemy engagement now uses actual contact-range distance, so enemies no longer stop at spawn just because a troop exists far below in the same lane.
+- `EnemySpawner` balances spawn columns within each wave instead of relying on pure random lane selection, preventing high-count waves from clustering heavily in the center by chance.
+- Troop tier visual sizing normalizes each active tier sprite against that troop's Tier 1 cleaned sprite, preserving the intended 1.0x / 1.15x / 1.3x visual progression even when imported art crops differ.
 - `Troop.MaxHP` now respects run HP buffs, and HP-boost cards heal the granted difference immediately.
-- `Troop` now supports single-use Bomber behavior, `HasExplodedThisWave`, bomber respawn/reset on wave start, inactive-state drag lockout, tier-scaled healer support power, runtime HP bars, and upgraded tier-glow visuals with a T3 pulse.
+- `Troop` now supports single-use Bomber behavior, `HasExplodedThisWave`, bomber respawn/reset on wave start, inactive-state drag lockout, tier-scaled healer support power, runtime HP bars, red troop-hit damage numbers, death-direction arrows, and upgraded tier-glow visuals with a T3 pulse.
 - HP bars are World Space Canvas with UI Images using `fillAmount`. Hierarchy: Prefab -> `HPBarRoot` (`Canvas`) -> `Background` + `Fill`. `Fill` image is `Type=Filled`, `Method=Horizontal`, `Origin=Left`. References are assigned via Inspector. The stale merged-HP-bar bug is fixed.
 - BattleGrid clears dead troops reliably so their slots reopen for next-wave deployment and revive/spawn cards.
 - The three new troop visuals are currently communicated with lightweight prototype FX: Mage purple sweep, Healer green pulse, and Bomber orange explosion circle.
 - `WaveManager` now builds a richer runtime HUD with merge count and active-buff text alongside the existing wave/coin labels.
 - `CardSystem` now emits buff-change notifications and can summarize the currently active run buffs for HUD display.
-- Starting lineup is still the default 2 Knights + 2 Archers for production flow, but the runtime now supports all 5 troop types and includes optional keyboard lineup presets for faster testing.
+- Starting lineup is still the default 2 Knights + 2 Archers for production flow, now distributed one per column. The runtime supports all 5 troop types and includes optional keyboard lineup presets for faster testing.
 - TextMeshPro is imported and the temporary fallback path is no longer needed.
 - Troop placeholder sprite tiling warnings were removed by switching to simple sprite scaling.
 - There are now 20 starter cards in the pool instead of 15.
@@ -315,6 +318,31 @@ Assets/_MergeAndMarch/
 **Issues:** DOTween is still not installed in the project manifest, so the requested pop/shake were recreated with coroutine easing instead of DOTween calls. The requested baseline recording step still needs to be done manually in-editor or with external capture.
 **Next:** Continue presentation polish beyond the merge moment, decide whether to install DOTween and/or author a dedicated `MergeBurstFX` prefab asset, then capture before/after footage for honest external feedback.
 **Kill criteria status:** The core merge beat should read much less like a raw prototype, but public-clip readiness still needs a hands-on visual pass in Game view and actual footage capture.
+
+### Session 11 - 2026-04-27
+**Duration:** Sprite assignment + clip-readiness presentation pass
+**Built:** Added tier-aware troop sprite support and assigned all imported troop sprites to `Knight`, `Archer`, `Mage`, `Healer`, and `Bomber` data. Assigned sprites to `Grunt`, `Rusher`, `Tank`, and `Flyer`, added a dedicated `Boss.asset`, and updated wave 16 to use boss data when present. Fixed current sprite metas to Single, 100 PPU, Bilinear, no mipmaps, Tight mesh, centered pivot, and uncompressed texture settings; added an editor postprocessor to keep future reimports aligned. Removed main-sprite tinting when art sprites are present so sprites do not look washed out. Added runtime background gradient, softer segmented lane guides, hidden-on-occupied slot indicators, styled HUD bars, BOSS wave styling, coin icon, active-buff panel, animated WAVE CLEARED banner, and more polished runtime card UI with headers, category labels, rarity gems, and staggered entrance animation.
+**Issues:** Font replacement was not completed because no new TTF was added to the project during this shell session. Actual Play Mode sizing/readability tuning and Recorder/OBS clip capture still need to happen in Unity's Game view. No DOTween install was performed.
+**Verification:** `dotnet build Assembly-CSharp.csproj` and `dotnet build Assembly-CSharp-Editor.csproj` both pass with zero warnings.
+**Next:** Let Unity reimport, manually inspect scale/HP bars/merge FX/card UI in Play Mode, make any by-eye scale tweaks, then record the 10s core-loop clip, 30s full-wave clip, and 60s progression highlight for external validation.
+**Kill criteria status:** The project is materially closer to a shareable clip, but the session is not complete until the new visuals are watched in motion and the actual clips are captured.
+
+### Session 12 - 2026-04-27
+**Duration:** Correctness bug-fix session
+**Built:** Fixed the post-import scale problem by normalizing each tier sprite's runtime scale against the troop's Tier 1 cleaned sprite, then set the configured progression to `0.1 / 0.115 / 0.13` so Tier 2 reads about 15% larger and Tier 3 about 30% larger without overflowing cells. Kept enemy art scale on the 100-PPU `enemyBaseScale = 0.1` path. Replaced pure-random enemy lane selection with per-wave balanced column selection to prevent high-count waves from stacking or clustering in the center. Fixed enemy contact logic so enemies only stop when within `enemyEngageDistance` of a valid troop instead of stopping far above the grid; Flyer frontline-skip behavior remains intact. Strengthened floating damage numbers with larger no-wrap TMP text, black outline, explicit rect size, and high Effects sorting.
+**Issues:** Unity Game view still needs hands-on validation for sprite sizing, lane distribution, Flyer movement, and damage-number readability because this shell session could only compile-check behavior.
+**Verification:** `dotnet build Assembly-CSharp.csproj` and `dotnet build Assembly-CSharp-Editor.csproj` both pass with zero warnings.
+**Next:** Run Play Mode and verify the four Session 12 bugs visually before any polish or feature work. If the fixes hold, proceed to clip capture.
+**Kill criteria status:** The code-level causes for the critical broken-looking gameplay clips are fixed, pending Unity Play Mode visual confirmation.
+
+### Session 13 - 2026-04-28
+**Duration:** Lane coverage + combat feedback fixes
+**Built:** Confirmed and documented the distributed default starting lineup so all four columns begin covered. Confirmed Knight adjacent-column targeting is active and preserves same melee reach while preferring own-column targets on equal distance. Added red troop damage numbers for enemy hits, optional attacker tracking on `Troop.ApplyDamage`, cached killer-position death arrows, cyan Flyer slash FX on backline hits, and compact melee impact FX for other enemy attacks. Added a tiny runtime `CombatFeedbackFx` helper so these effects fade independently after the damaged troop is destroyed.
+**Biggest perceived impact:** Expected to be Flyer slash FX plus red troop damage numbers, because back-row Mage/Healer damage should finally read as an enemy action instead of a sudden unexplained death.
+**Issues:** Full Play Mode readability validation and the requested fresh 60-second clip still need to be recorded manually in Unity/OBS. No new gameplay bugs surfaced from shell verification.
+**Verification:** `dotnet build Assembly-CSharp.csproj` and `dotnet build Assembly-CSharp-Editor.csproj` both pass with zero warnings.
+**Next:** Run Play Mode through early, mid, and late waves to verify every troop damage instance has a readable hit, death arrows point toward the killer, and adjacent Knights meaningfully soften empty-column losses. Then record the 60-second readability clip.
+**Kill criteria status:** The code-level clarity fixes are complete; final confirmation depends on Game view playtesting and footage capture.
 
 ---
 

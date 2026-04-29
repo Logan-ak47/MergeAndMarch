@@ -22,4 +22,4 @@ MonoBehaviour:
   sizeScale: 0.85
   skipsFrontline: 0
   renderYOffset: 0
-  sprite: {fileID: 0}
+  sprite: {fileID: 21300000, guid: 0c8fa871a9925934f93fcc1f169267ee, type: 3}

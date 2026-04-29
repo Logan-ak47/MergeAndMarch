@@ -20,6 +20,7 @@ namespace MergeAndMarch.Gameplay
         [SerializeField] private EnemyData rusherData;
         [SerializeField] private EnemyData tankData;
         [SerializeField] private EnemyData flyerData;
+        [SerializeField] private EnemyData bossData;
         [SerializeField] private Transform enemyRoot;
 
         private Coroutine spawnRoutine;
@@ -29,6 +30,7 @@ namespace MergeAndMarch.Gameplay
         private bool isSpawningWave;
         private bool waveClearedRaised;
         private int currentWave;
+        private readonly List<int> waveSpawnColumns = new();
 
         public event Action<int> WaveClearedEvent;
         public event Action EnemyEscapedEvent;
@@ -122,14 +124,15 @@ namespace MergeAndMarch.Gameplay
 
             if (waveNumber == 16)
             {
-                SpawnEnemy(gruntData, waveNumber, spawnY, failY, parent);
+                SpawnEnemy(bossData != null ? bossData : gruntData, waveNumber, spawnY, failY, parent);
             }
             else
             {
                 List<EnemyData> waveEnemies = GetWaveEnemies(waveNumber);
+                BuildWaveSpawnColumns(waveEnemies.Count);
                 for (int i = 0; i < waveEnemies.Count; i++)
                 {
-                    SpawnEnemy(waveEnemies[i], waveNumber, spawnY, failY, parent);
+                    SpawnEnemyAtColumn(waveEnemies[i], waveNumber, spawnY, failY, parent, waveSpawnColumns[i], i);
                     if (i < waveEnemies.Count - 1)
                     {
                         float delay = UnityEngine.Random.Range(gameConfig.enemySpawnIntervalMin, gameConfig.enemySpawnIntervalMax);
@@ -145,14 +148,20 @@ namespace MergeAndMarch.Gameplay
 
         private void SpawnEnemy(EnemyData data, int waveNumber, float spawnY, float failY, Transform parent)
         {
+            int column = UnityEngine.Random.Range(0, Mathf.Max(1, gameConfig.columns));
+            SpawnEnemyAtColumn(data, waveNumber, spawnY, failY, parent, column, spawnedThisWave);
+        }
+
+        private void SpawnEnemyAtColumn(EnemyData data, int waveNumber, float spawnY, float failY, Transform parent, int column, int spawnIndex)
+        {
             if (data == null)
             {
                 data = gruntData;
             }
 
-            int column = UnityEngine.Random.Range(0, gameConfig.columns);
+            column = Mathf.Clamp(column, 0, Mathf.Max(0, gameConfig.columns - 1));
             Vector3 lanePos = battleGrid.GetSlotWorldPosition(column, 0);
-            float xOffset = UnityEngine.Random.Range(-gameConfig.cellSize * 0.18f, gameConfig.cellSize * 0.18f);
+            float xOffset = GetSpawnXOffset(spawnIndex);
             Vector3 spawnPosition = new(lanePos.x + xOffset, spawnY, 0f);
 
             float healthMultiplier = waveNumber == 16 ? 5f : 1f + ((waveNumber - 1) * 0.12f);
@@ -184,6 +193,13 @@ namespace MergeAndMarch.Gameplay
                 speedMultiplier);
             spawnedThisWave++;
             activeEnemyCount++;
+        }
+
+        private float GetSpawnXOffset(int spawnIndex)
+        {
+            float randomOffset = UnityEngine.Random.Range(-gameConfig.cellSize * 0.12f, gameConfig.cellSize * 0.12f);
+            float deterministicNudge = ((spawnIndex % 5) - 2) * gameConfig.cellSize * 0.01f;
+            return Mathf.Clamp(randomOffset + deterministicNudge, -gameConfig.cellSize * 0.18f, gameConfig.cellSize * 0.18f);
         }
 
         private List<EnemyData> GetWaveEnemies(int wave)
@@ -275,6 +291,33 @@ namespace MergeAndMarch.Gameplay
             }
         }
 
+        private void BuildWaveSpawnColumns(int enemyCount)
+        {
+            int columnCount = Mathf.Max(1, gameConfig.columns);
+            waveSpawnColumns.Clear();
+
+            int[] columnOrder = new int[columnCount];
+            for (int i = 0; i < columnOrder.Length; i++)
+            {
+                columnOrder[i] = i;
+            }
+
+            ShuffleColumns(columnOrder);
+            for (int i = 0; i < enemyCount; i++)
+            {
+                waveSpawnColumns.Add(columnOrder[i % columnOrder.Length]);
+            }
+        }
+
+        private static void ShuffleColumns(int[] columns)
+        {
+            for (int i = columns.Length - 1; i > 0; i--)
+            {
+                int swapIndex = UnityEngine.Random.Range(0, i + 1);
+                (columns[i], columns[swapIndex]) = (columns[swapIndex], columns[i]);
+            }
+        }
+
         private void EvaluateWaveCleared()
         {
             if (!WaveCleared || waveClearedRaised)
@@ -293,6 +336,7 @@ namespace MergeAndMarch.Gameplay
             defeatedThisWave = 0;
             isSpawningWave = false;
             waveClearedRaised = false;
+            waveSpawnColumns.Clear();
         }
 
         private void ResolveReferences()
@@ -335,6 +379,11 @@ namespace MergeAndMarch.Gameplay
             if (flyerData == null)
             {
                 flyerData = AssetDatabase.LoadAssetAtPath<EnemyData>("Assets/_MergeAndMarch/ScriptableObjects/Flyer.asset");
+            }
+
+            if (bossData == null)
+            {
+                bossData = AssetDatabase.LoadAssetAtPath<EnemyData>("Assets/_MergeAndMarch/ScriptableObjects/Boss.asset");
             }
 
             if (enemyPrefab == null)

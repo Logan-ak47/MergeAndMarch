@@ -13,6 +13,18 @@ namespace MergeAndMarch.Data
         [Min(0.05f)] public float attackInterval = 1f;
         public TroopTargeting targeting = TroopTargeting.Melee;
         [Min(0f)] public float supportPower = 0f;
+        public Sprite[] tierSprites = new Sprite[3];
         public Sprite sprite;
+
+        public Sprite GetSpriteForTier(int tier)
+        {
+            int index = Mathf.Clamp(tier, 1, 3) - 1;
+            if (tierSprites != null && index < tierSprites.Length && tierSprites[index] != null)
+            {
+                return tierSprites[index];
+            }
+
+            return sprite;
+        }
     }
 }

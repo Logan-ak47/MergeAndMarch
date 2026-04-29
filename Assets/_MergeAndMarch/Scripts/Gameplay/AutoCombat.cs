@@ -175,6 +175,7 @@ namespace MergeAndMarch.Gameplay
             IReadOnlyList<Enemy> enemies = Enemy.ActiveEnemies;
             Enemy best = null;
             float bestDistance = float.MaxValue;
+            int bestColumnOffset = int.MaxValue;
             RunBuffs buffs = CardSystem.Instance != null ? CardSystem.Instance.runBuffs : null;
 
             for (int i = 0; i < enemies.Count; i++)
@@ -186,9 +187,11 @@ namespace MergeAndMarch.Gameplay
                 }
 
                 float verticalDistance = troop.transform.position.y - enemy.transform.position.y;
+                int columnOffset = 0;
                 if (troop.Data.troopType == TroopType.Knight)
                 {
-                    if (enemy.LaneColumn != troop.Column)
+                    columnOffset = Mathf.Abs(enemy.LaneColumn - troop.Column);
+                    if (columnOffset > 1)
                     {
                         continue;
                     }
@@ -206,10 +209,19 @@ namespace MergeAndMarch.Gameplay
                 }
 
                 float absDistance = Mathf.Abs(verticalDistance);
-                if (absDistance < bestDistance)
+                bool isBetterTarget = absDistance < bestDistance;
+                if (troop.Data.troopType == TroopType.Knight
+                    && Mathf.Approximately(absDistance, bestDistance)
+                    && columnOffset < bestColumnOffset)
+                {
+                    isBetterTarget = true;
+                }
+
+                if (isBetterTarget)
                 {
                     best = enemy;
                     bestDistance = absDistance;
+                    bestColumnOffset = columnOffset;
                 }
             }
 

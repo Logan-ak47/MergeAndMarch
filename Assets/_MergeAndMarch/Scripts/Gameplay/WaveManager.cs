@@ -33,6 +33,9 @@ namespace MergeAndMarch.Gameplay
         private Coroutine runRoutine;
         private Coroutine restartRoutine;
         private Canvas hudCanvas;
+        private Image waveCounterBar;
+        private Image coinCounterIcon;
+        private Image activeBuffsPanel;
         private TextMeshProUGUI waveCounterText;
         private TextMeshProUGUI coinCounterText;
         private TextMeshProUGUI mergeCounterText;
@@ -197,9 +200,7 @@ namespace MergeAndMarch.Gameplay
         private IEnumerator RunPostWaveSequence(int clearedWave)
         {
             State = WaveState.WaveCleared;
-            waveClearedText.gameObject.SetActive(true);
-            yield return new WaitForSecondsRealtime(gameConfig.waveClearedBannerDuration);
-            waveClearedText.gameObject.SetActive(false);
+            yield return PlayWaveClearedRoutine();
 
             if (IsCardPickWave(clearedWave) && cardSystem != null)
             {
@@ -344,12 +345,14 @@ namespace MergeAndMarch.Gameplay
 
             if (waveCounterText == null)
             {
-                waveCounterText = CreateText("WaveCounter", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(320f, 60f), 34, TextAlignmentOptions.Center);
+                waveCounterBar = CreatePanel("WaveCounterBar", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -44f), new Vector2(360f, 62f), new Color(0f, 0f, 0f, 0.6f));
+                waveCounterText = CreateText("WaveCounter", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -42f), new Vector2(320f, 58f), 42, TextAlignmentOptions.Center);
             }
 
             if (coinCounterText == null)
             {
-                coinCounterText = CreateText("CoinCounter", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-36f, -40f), new Vector2(240f, 60f), 30, TextAlignmentOptions.Right);
+                coinCounterIcon = CreatePanel("CoinIcon", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-180f, -40f), new Vector2(32f, 32f), new Color(1f, 0.78f, 0.16f, 1f));
+                coinCounterText = CreateText("CoinCounter", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-36f, -40f), new Vector2(150f, 48f), 32, TextAlignmentOptions.Right);
             }
 
             if (mergeCounterText == null)
@@ -359,14 +362,16 @@ namespace MergeAndMarch.Gameplay
 
             if (activeBuffsText == null)
             {
-                activeBuffsText = CreateText("ActiveBuffsText", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -24f), new Vector2(320f, 200f), 14, TextAlignmentOptions.TopLeft);
-                activeBuffsText.enableWordWrapping = false;
+                activeBuffsPanel = CreatePanel("ActiveBuffsPanel", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(18f, -18f), new Vector2(310f, 150f), new Color(0f, 0f, 0f, 0.36f));
+                activeBuffsText = CreateText("ActiveBuffsText", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(34f, -28f), new Vector2(280f, 130f), 22, TextAlignmentOptions.TopLeft);
+                activeBuffsText.textWrappingMode = TextWrappingModes.NoWrap;
             }
 
             if (waveClearedText == null)
             {
-                waveClearedText = CreateText("WaveClearedText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(600f, 80f), 42, TextAlignmentOptions.Center);
+                waveClearedText = CreateText("WaveClearedText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(680f, 110f), 60, TextAlignmentOptions.Center);
                 waveClearedText.text = "WAVE CLEARED";
+                waveClearedText.color = new Color(1f, 0.843f, 0f, 1f);
             }
 
             if (runEndText == null)
@@ -403,10 +408,42 @@ namespace MergeAndMarch.Gameplay
 
             text.font = TMP_Settings.defaultFontAsset;
             text.fontSize = fontSize;
+            text.fontStyle = FontStyles.Bold;
             text.alignment = alignment;
             text.color = Color.white;
+            text.outlineColor = Color.black;
+            text.outlineWidth = 0.18f;
             text.text = string.Empty;
             return text;
+        }
+
+        private Image CreatePanel(string objectName, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition, Vector2 size, Color color)
+        {
+            Transform existing = hudCanvas.transform.Find(objectName);
+            GameObject panelObject = existing != null ? existing.gameObject : new GameObject(objectName);
+            panelObject.transform.SetParent(hudCanvas.transform, false);
+
+            RectTransform rectTransform = panelObject.GetComponent<RectTransform>();
+            if (rectTransform == null)
+            {
+                rectTransform = panelObject.AddComponent<RectTransform>();
+            }
+
+            rectTransform.anchorMin = anchorMin;
+            rectTransform.anchorMax = anchorMax;
+            rectTransform.pivot = pivot;
+            rectTransform.anchoredPosition = anchoredPosition;
+            rectTransform.sizeDelta = size;
+
+            Image image = panelObject.GetComponent<Image>();
+            if (image == null)
+            {
+                image = panelObject.AddComponent<Image>();
+            }
+
+            image.color = color;
+            image.raycastTarget = false;
+            return image;
         }
 
         private void UpdateWaveCounter()
@@ -419,17 +456,22 @@ namespace MergeAndMarch.Gameplay
             if (currentWave <= 0)
             {
                 waveCounterText.text = "Wave 1 / 15";
+                waveCounterText.color = Color.white;
+                waveCounterText.fontSize = 42;
                 return;
             }
 
-            waveCounterText.text = currentWave >= 16 ? "BOSS" : $"Wave {currentWave} / 15";
+            bool isBoss = currentWave >= 16;
+            waveCounterText.text = isBoss ? "BOSS" : $"Wave {currentWave} / 15";
+            waveCounterText.color = isBoss ? new Color(1f, 0.78f, 0.16f, 1f) : Color.white;
+            waveCounterText.fontSize = isBoss ? 48 : 42;
         }
 
         private void UpdateCoinCounter()
         {
             if (coinCounterText != null)
             {
-                coinCounterText.text = $"Coins: {totalCoins}";
+                coinCounterText.text = totalCoins.ToString();
             }
         }
 
@@ -449,6 +491,51 @@ namespace MergeAndMarch.Gameplay
             }
 
             activeBuffsText.text = cardSystem != null ? cardSystem.GetActiveBuffSummary() : "Active Buffs:\nNone";
+        }
+
+        private IEnumerator PlayWaveClearedRoutine()
+        {
+            if (waveClearedText == null)
+            {
+                yield break;
+            }
+
+            waveClearedText.gameObject.SetActive(true);
+            waveClearedText.color = new Color(1f, 0.843f, 0f, 1f);
+            waveClearedText.transform.localScale = Vector3.zero;
+
+            float elapsed = 0f;
+            while (elapsed < 0.2f)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / 0.2f);
+                waveClearedText.transform.localScale = Vector3.one * Mathf.Lerp(0f, 1.2f, Mathf.SmoothStep(0f, 1f, t));
+                yield return null;
+            }
+
+            elapsed = 0f;
+            while (elapsed < 0.1f)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / 0.1f);
+                waveClearedText.transform.localScale = Vector3.one * Mathf.Lerp(1.2f, 1f, Mathf.SmoothStep(0f, 1f, t));
+                yield return null;
+            }
+
+            yield return new WaitForSecondsRealtime(Mathf.Max(0.1f, gameConfig.waveClearedBannerDuration));
+
+            elapsed = 0f;
+            Color startColor = waveClearedText.color;
+            while (elapsed < 0.3f)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / 0.3f);
+                waveClearedText.color = new Color(startColor.r, startColor.g, startColor.b, Mathf.Lerp(1f, 0f, t));
+                yield return null;
+            }
+
+            waveClearedText.gameObject.SetActive(false);
+            waveClearedText.transform.localScale = Vector3.one;
         }
 
         private void ShowRunEnd(string message)

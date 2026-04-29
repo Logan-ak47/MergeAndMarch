@@ -138,10 +138,11 @@ namespace MergeAndMarch.Editor
             asset.rows = 2;
             asset.cellSize = 1.15f;
             asset.gridOffset = new Vector2(-1.725f, -3.6f);
-            asset.troopBaseScale = 0.82f;
-            asset.tierTwoScale = 0.97f;
-            asset.tierThreeScale = 1.12f;
+            asset.troopBaseScale = 0.1f;
+            asset.tierTwoScale = 0.115f;
+            asset.tierThreeScale = 0.13f;
             asset.slotVisualScale = 0.88f;
+            asset.enemyBaseScale = 0.1f;
 
             EditorUtility.SetDirty(asset);
             return asset;
@@ -176,10 +177,24 @@ namespace MergeAndMarch.Editor
             asset.baseAttack = baseAttack;
             asset.attackInterval = attackInterval;
             asset.supportPower = supportPower;
-            asset.sprite = sprite;
+            asset.tierSprites = LoadTierSprites(assetName);
+            asset.sprite = asset.tierSprites != null && asset.tierSprites.Length > 0 && asset.tierSprites[0] != null
+                ? asset.tierSprites[0]
+                : sprite;
 
             EditorUtility.SetDirty(asset);
             return asset;
+        }
+
+        private static Sprite[] LoadTierSprites(string troopName)
+        {
+            Sprite[] sprites = new Sprite[3];
+            for (int i = 0; i < sprites.Length; i++)
+            {
+                sprites[i] = AssetDatabase.LoadAssetAtPath<Sprite>($"{RootPath}/Sprites/Troops/{troopName}_T{i + 1}.png");
+            }
+
+            return sprites;
         }
 
         private static Troop EnsureTroopPrefab(Sprite sprite)
@@ -207,7 +222,7 @@ namespace MergeAndMarch.Editor
 
         private static Camera ConfigureSceneCamera()
         {
-            Camera camera = Object.FindObjectOfType<Camera>();
+            Camera camera = Object.FindFirstObjectByType<Camera>();
 
             if (camera == null)
             {
