@@ -7,10 +7,10 @@
 ## PROJECT STATUS
 
 **Current Phase:** Phase 2 - Roguelike Cards + Readability + Enemy Variety
-**Session Count:** 13
-**Last Session Date:** 2026-04-28
-**Last Session Summary:** Session 13 addressed lane coverage and invisible troop deaths. The starting lineup now distributes one troop per column in the default Knight/Archer pattern, and Knights can target enemies in their own and adjacent columns while still preferring own-column targets on equal distance. Troops now show red floating damage numbers when hit, enemy attacks now spawn visible hit FX (cyan flyer slash for Flyers, compact melee impact for Grunt/Tank/Rusher-style attackers), and troop deaths spawn a red one-second direction arrow toward the cached last attacker position. Runtime and editor assemblies build cleanly with zero warnings.
-**Next Task:** Open Unity, let assets reimport, do a hands-on Play Mode validation pass for Session 13 readability: distributed start, adjacent Knight coverage, flyer slash on Mage/Healer hits, red troop damage numbers, melee impact FX, and death arrows. If those pass, record the requested fresh 60-second clip showing combat readability improvements. Font replacement and actual Recorder/OBS capture are still manual pending items.
+**Session Count:** 14
+**Last Session Date:** 2026-05-04
+**Last Session Summary:** Session 14 fixed the Session 11 sprite scale problem at the source by moving troop sprite imports to 1100 PPU and enemy sprite imports to 1200 PPU, then reset runtime visual scales to readable multipliers (`troopBaseScale = 1`, `tierTwoScale = 1.15`, `tierThreeScale = 1.3`, `enemyBaseScale = 1`). Troop tier visual scaling now applies `troopBaseScale * tierMultiplier` while still normalizing art crop differences against Tier 1. Tier glow and merge highlight sizing now recalculates from current sprite bounds using small world-space padding, preventing T2/T3 glow from ballooning after merges. Damage numbers were reduced, now float only 0.4 world units, fade after halfway, use softer troop-hit red, and compact 1000+ values to `K` format. Empty-slot indicators are now generated hollow rounded-square outlines around 0.7 world units wide, hidden on occupied slots, visible again when slots clear, and gently pulsing between 20-35% alpha. Lane guides were tuned to soft white 16% alpha and markers to 18%. Runtime and editor assemblies build cleanly with zero warnings.
+**Next Task:** Open Unity, let assets reimport, then do a focused Play Mode visual validation pass: troop fit in cells, T2/T3 size progression, adjacent-slot overlap, Grunt/Tank/Boss relative sizes, damage-number readability, empty-slot indicator visibility/pulse, lane guide strength, wave counter contrast, active-buffs panel fit, HP bar offsets, merge highlight sizing, drag colliders, and damage-number spawn positions. If those pass, record the requested fresh 60-second readability clip.
 
 ---
 
@@ -157,10 +157,11 @@ Assets/_MergeAndMarch/
 - Current tuning in `GameConfig`:
   - `cellSize = 1.15`
   - `gridOffset = (-1.725, -3.6)`
-  - `troopBaseScale = 0.1`
-  - `tierTwoScale = 0.115`
-  - `tierThreeScale = 0.13`
-  - `enemyBaseScale = 0.1`
+  - `troopBaseScale = 1`
+  - `tierTwoScale = 1.15`
+  - `tierThreeScale = 1.3`
+  - `slotVisualScale = 0.61`
+  - `enemyBaseScale = 1`
   - `laneGuideHeight = 5.8`
   - `laneGuideWidthScale = 0.1`
   - `laneGuideMarkerScale = 0.16`
@@ -184,7 +185,7 @@ Assets/_MergeAndMarch/
 - `Enemy` now handles Bomber row-contact triggering, still applies Knight thorns when appropriate, spawns floating damage numbers for each damage instance, and shows attack impact FX when damaging troops.
 - Enemy engagement now uses actual contact-range distance, so enemies no longer stop at spawn just because a troop exists far below in the same lane.
 - `EnemySpawner` balances spawn columns within each wave instead of relying on pure random lane selection, preventing high-count waves from clustering heavily in the center by chance.
-- Troop tier visual sizing normalizes each active tier sprite against that troop's Tier 1 cleaned sprite, preserving the intended 1.0x / 1.15x / 1.3x visual progression even when imported art crops differ.
+- Troop and enemy sprites now import at gameplay-sized PPUs instead of 100 PPU: troops use 1100 PPU and enemies use 1200 PPU. Troop tier visual sizing applies `troopBaseScale * tierMultiplier` and still normalizes each active tier sprite against that troop's Tier 1 cleaned sprite, preserving the intended 1.0x / 1.15x / 1.3x visual progression even when imported art crops differ.
 - `Troop.MaxHP` now respects run HP buffs, and HP-boost cards heal the granted difference immediately.
 - `Troop` now supports single-use Bomber behavior, `HasExplodedThisWave`, bomber respawn/reset on wave start, inactive-state drag lockout, tier-scaled healer support power, runtime HP bars, red troop-hit damage numbers, death-direction arrows, and upgraded tier-glow visuals with a T3 pulse.
 - HP bars are World Space Canvas with UI Images using `fillAmount`. Hierarchy: Prefab -> `HPBarRoot` (`Canvas`) -> `Background` + `Fill`. `Fill` image is `Type=Filled`, `Method=Horizontal`, `Origin=Left`. References are assigned via Inspector. The stale merged-HP-bar bug is fixed.
@@ -343,6 +344,14 @@ Assets/_MergeAndMarch/
 **Verification:** `dotnet build Assembly-CSharp.csproj` and `dotnet build Assembly-CSharp-Editor.csproj` both pass with zero warnings.
 **Next:** Run Play Mode through early, mid, and late waves to verify every troop damage instance has a readable hit, death arrows point toward the killer, and adjacent Knights meaningfully soften empty-column losses. Then record the 60-second readability clip.
 **Kill criteria status:** The code-level clarity fixes are complete; final confirmation depends on Game view playtesting and footage capture.
+
+### Session 14 - 2026-05-04
+**Duration:** Focused visual sizing fix session
+**Built:** Changed all current troop sprite metas to 1100 PPU and all current enemy sprite metas to 1200 PPU so art imports near the intended world size. Updated `MergeAndMarchSpritePostprocessor` so future reimports keep those PPU values by folder. Reset `GameConfig` and scene setup defaults to `troopBaseScale = 1`, `tierTwoScale = 1.15`, `tierThreeScale = 1.3`, and `enemyBaseScale = 1`. Fixed `Troop.ResolveTierVisualScale` so tier sizes are true multipliers on top of base scale, while still compensating for tier art crop differences. Recalibrated `TierGlow` and `MergeHighlight` child scales from the current sprite bounds using fixed world-space padding, so glow/highlight sizes stay proportional after T2/T3 merge upgrades and during merge pop animations. Reduced floating damage-number size and float distance, shifted fading to the second half of the lifetime, softened troop-hit red to `#FF8888`, added compact `K` formatting for 1000+ damage, and set `Boss.asset` `sizeScale` to 2 so Boss data itself is dramatic before wave scaling. Reworked empty slots into generated hollow rounded-square outlines around 0.7 world units wide, soft white, hidden when occupied, restored when cleared, and pulsing gently between 20-35% alpha. Tuned lane guides to 16% alpha and lane markers to 18%.
+**Issues:** Unity MCP resources were not available in this shell session, so verification was limited to file inspection and C# builds. Unity still needs to reimport the changed sprite metas before Game view validation. The requested start-to-finish Play Mode run could not be performed from this environment.
+**Verification:** `dotnet build Assembly-CSharp.csproj` and `dotnet build Assembly-CSharp-Editor.csproj` both pass with zero warnings. The first parallel editor build failed only because both builds tried to write the same temp DLL at once; rerunning editor build alone passed. Follow-up builds after the slot visual pass also passed with zero warnings.
+**Next:** Open Unity and let the sprite reimport finish, then Play Mode check cell fit, tier progression, adjacent overlap, enemy relative sizes, damage-number readability, empty-slot outline readability/pulse, lane guide strength, wave counter contrast, active-buffs panel fit, HP bar offsets, merge highlight size, drag colliders, and damage-number spawn positions.
+**Kill criteria status:** Code/import settings now match the requested visual sizing model; final confirmation depends on Game view validation.
 
 ---
 

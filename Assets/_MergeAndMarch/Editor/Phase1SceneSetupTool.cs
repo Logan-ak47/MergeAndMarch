@@ -138,11 +138,14 @@ namespace MergeAndMarch.Editor
             asset.rows = 2;
             asset.cellSize = 1.15f;
             asset.gridOffset = new Vector2(-1.725f, -3.6f);
-            asset.troopBaseScale = 0.1f;
-            asset.tierTwoScale = 0.115f;
-            asset.tierThreeScale = 0.13f;
-            asset.slotVisualScale = 0.88f;
-            asset.enemyBaseScale = 0.1f;
+            asset.troopBaseScale = 1f;
+            asset.tierTwoScale = 1.15f;
+            asset.tierThreeScale = 1.3f;
+            asset.slotVisualScale = 0.61f;
+            asset.slotTint = new Color(1f, 1f, 1f, 0.3f);
+            asset.laneGuideTint = new Color(1f, 1f, 1f, 0.16f);
+            asset.laneGuideMarkerTint = new Color(1f, 1f, 1f, 0.18f);
+            asset.enemyBaseScale = 1f;
 
             EditorUtility.SetDirty(asset);
             return asset;

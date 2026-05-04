@@ -12,11 +12,11 @@ namespace MergeAndMarch.Data
         public Vector2 gridOffset = new(-1.725f, -3.6f);
 
         [Header("Troop Visuals")]
-        [Min(0.01f)] public float troopBaseScale = 0.1f;
-        [Min(0.01f)] public float tierTwoScale = 0.115f;
-        [Min(0.01f)] public float tierThreeScale = 0.13f;
-        [Min(0.1f)] public float slotVisualScale = 0.88f;
-        public Color slotTint = new(1f, 1f, 1f, 0.14f);
+        [Min(0.01f)] public float troopBaseScale = 1f;
+        [Min(0.01f)] public float tierTwoScale = 1.15f;
+        [Min(0.01f)] public float tierThreeScale = 1.3f;
+        [Min(0.1f)] public float slotVisualScale = 0.61f;
+        public Color slotTint = new(1f, 1f, 1f, 0.3f);
         public Color tierTwoTint = new(1f, 1f, 1f, 1f);
         public Color tierThreeTint = new(1f, 0.95f, 0.95f, 1f);
 
@@ -24,8 +24,8 @@ namespace MergeAndMarch.Data
         [Min(0.1f)] public float laneGuideHeight = 5.8f;
         [Range(0.02f, 0.5f)] public float laneGuideWidthScale = 0.1f;
         [Range(0.02f, 0.5f)] public float laneGuideMarkerScale = 0.16f;
-        public Color laneGuideTint = new(1f, 1f, 1f, 0.08f);
-        public Color laneGuideMarkerTint = new(1f, 1f, 1f, 0.14f);
+        public Color laneGuideTint = new(1f, 1f, 1f, 0.16f);
+        public Color laneGuideMarkerTint = new(1f, 1f, 1f, 0.18f);
 
         [Header("Merge")]
         [Range(0.01f, 1f)] public float tacticalSlowTimeScale = 0.2f;
@@ -37,7 +37,7 @@ namespace MergeAndMarch.Data
         [Min(0.01f)] public float swapMoveDuration = 0.12f;
 
         [Header("Combat")]
-        [Min(0.01f)] public float enemyBaseScale = 0.1f;
+        [Min(0.01f)] public float enemyBaseScale = 1f;
         [Min(0.1f)] public float enemySpawnYOffset = 2.2f;
         [Min(0.1f)] public float enemyFailOffset = 0.8f;
         [Min(0.05f)] public float enemyEngageDistance = 0.3f;

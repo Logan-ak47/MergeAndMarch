@@ -7,6 +7,7 @@ namespace MergeAndMarch.Gameplay
     public class BattleGrid : MonoBehaviour
     {
         private static Sprite runtimeSquareSprite;
+        private static Sprite runtimeSlotOutlineSprite;
         private static Sprite runtimeBackgroundGradientSprite;
 
         [SerializeField] private GameConfig config;
@@ -31,12 +32,12 @@ namespace MergeAndMarch.Gameplay
             ResolveExistingSlotVisuals();
             RebuildLaneVisuals();
             RebuildOccupantsFromScene();
-            UpdateSlotVisualVisibility();
+            UpdateSlotVisuals();
         }
 
         private void LateUpdate()
         {
-            UpdateSlotVisualVisibility();
+            UpdateSlotVisuals();
         }
 
         public void SetConfig(GameConfig gameConfig)
@@ -312,7 +313,7 @@ namespace MergeAndMarch.Gameplay
 
         public void RebuildSlotVisuals(Sprite slotSprite)
         {
-            if (config == null || slotVisualRoot == null || slotSprite == null)
+            if (config == null || slotVisualRoot == null)
             {
                 return;
             }
@@ -330,7 +331,7 @@ namespace MergeAndMarch.Gameplay
                     slot.transform.localScale = Vector3.one * (config.cellSize * config.slotVisualScale);
 
                     SpriteRenderer renderer = slot.AddComponent<SpriteRenderer>();
-                    renderer.sprite = slotSprite;
+                    renderer.sprite = GetRuntimeSlotOutlineSprite();
                     renderer.color = config.slotTint;
                     renderer.sortingLayerName = "Grid";
                     renderer.sortingOrder = 0;
@@ -438,13 +439,15 @@ namespace MergeAndMarch.Gameplay
             backgroundRenderer.transform.localScale = new Vector3(width, height, 1f);
         }
 
-        private void UpdateSlotVisualVisibility()
+        private void UpdateSlotVisuals()
         {
             if (config == null || slotVisuals == null || occupants == null)
             {
                 return;
             }
 
+            float pulse = 0.5f + (Mathf.Sin(Time.time * (Mathf.PI * 2f / 1.5f)) * 0.5f);
+            float alpha = Mathf.Lerp(0.2f, 0.35f, pulse);
             for (int column = 0; column < config.columns; column++)
             {
                 for (int row = 0; row < config.rows; row++)
@@ -456,6 +459,7 @@ namespace MergeAndMarch.Gameplay
                     }
 
                     renderer.enabled = occupants[column, row] == null;
+                    renderer.color = WithAlpha(config.slotTint, alpha);
                 }
             }
         }
@@ -476,6 +480,10 @@ namespace MergeAndMarch.Gameplay
                     if (child != null)
                     {
                         slotVisuals[column, row] = child.GetComponent<SpriteRenderer>();
+                        if (slotVisuals[column, row] != null)
+                        {
+                            slotVisuals[column, row].sprite = GetRuntimeSlotOutlineSprite();
+                        }
                     }
                 }
             }
@@ -568,6 +576,39 @@ namespace MergeAndMarch.Gameplay
             return runtimeSquareSprite;
         }
 
+        private static Sprite GetRuntimeSlotOutlineSprite()
+        {
+            if (runtimeSlotOutlineSprite != null)
+            {
+                return runtimeSlotOutlineSprite;
+            }
+
+            const int size = 64;
+            const float radius = 10f;
+            const float border = 4f;
+            Texture2D texture = new(size, size, TextureFormat.RGBA32, false);
+            Color[] pixels = new Color[size * size];
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    Vector2 point = new(x + 0.5f, y + 0.5f);
+                    bool outer = IsInsideRoundedRect(point, size, radius);
+                    bool inner = IsInsideRoundedRect(point, size - (border * 2f), Mathf.Max(0f, radius - border), border);
+                    pixels[(y * size) + x] = outer && !inner ? Color.white : Color.clear;
+                }
+            }
+
+            texture.SetPixels(pixels);
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            texture.Apply();
+            runtimeSlotOutlineSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
+            runtimeSlotOutlineSprite.name = "BattleGridSlotOutline";
+            return runtimeSlotOutlineSprite;
+        }
+
         private static Sprite GetRuntimeBackgroundGradientSprite()
         {
             if (runtimeBackgroundGradientSprite != null)
@@ -595,6 +636,21 @@ namespace MergeAndMarch.Gameplay
         {
             color.a = alpha;
             return color;
+        }
+
+        private static bool IsInsideRoundedRect(Vector2 point, float size, float radius, float inset = 0f)
+        {
+            float min = inset;
+            float max = inset + size;
+            if (point.x < min || point.x > max || point.y < min || point.y > max)
+            {
+                return false;
+            }
+
+            float clampedX = Mathf.Clamp(point.x, min + radius, max - radius);
+            float clampedY = Mathf.Clamp(point.y, min + radius, max - radius);
+            Vector2 nearest = new(clampedX, clampedY);
+            return (point - nearest).sqrMagnitude <= radius * radius;
         }
     }
 }

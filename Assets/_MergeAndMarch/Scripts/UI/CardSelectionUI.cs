@@ -13,6 +13,7 @@ namespace MergeAndMarch.UI
     {
         [SerializeField] private Canvas targetCanvas;
         [SerializeField] private GameObject parentPanel;
+        [SerializeField] private GameObject cardPrefab;
 
         private Action<int> onCardSelected;
         private Coroutine entranceRoutine;
@@ -94,6 +95,7 @@ namespace MergeAndMarch.UI
                 title.enableAutoSizing = true;
                 title.fontSizeMin = 16f;
                 title.fontSizeMax = 24f;
+                title.alignment = TextAlignmentOptions.MidlineLeft;
                 title.margin = Vector4.zero;
             }
 
@@ -122,6 +124,7 @@ namespace MergeAndMarch.UI
                 icon.enableAutoSizing = true;
                 icon.fontSizeMin = 10f;
                 icon.fontSizeMax = 16f;
+                icon.alignment = TextAlignmentOptions.Center;
             }
 
             ConfigureRarityGems(cardObject.transform, card.rarity);
@@ -216,7 +219,7 @@ namespace MergeAndMarch.UI
         private void CreateCard(Transform parent, int index)
         {
             Transform existing = parent.Find($"Card_{index}");
-            GameObject cardObject = existing != null ? existing.gameObject : new GameObject($"Card_{index}", typeof(RectTransform), typeof(Image), typeof(Button));
+            GameObject cardObject = existing != null ? existing.gameObject : CreateCardObject(parent, index);
             cardObject.transform.SetParent(parent, false);
 
             RectTransform rect = cardObject.GetComponent<RectTransform>();
@@ -252,16 +255,39 @@ namespace MergeAndMarch.UI
             colors.pressedColor = new Color(0.9f, 0.9f, 0.9f, 0.92f);
             button.colors = colors;
 
-            CreateCardPanel(cardObject.transform, "Header", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -38f), new Vector2(0f, 76f), Color.white);
-            CreateCardPanel(cardObject.transform, "Badge", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0.5f, 0.5f), new Vector2(44f, -38f), new Vector2(56f, 32f), new Color(0f, 0f, 0f, 0.18f));
-            CreateText(cardObject.transform, "Icon", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(44f, -38f), new Vector2(56f, 30f), 16, FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText(cardObject.transform, "Title", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(38f, -38f), new Vector2(-104f, 46f), 24, FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText(cardObject.transform, "Description", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -12f), new Vector2(238f, 182f), 22, FontStyles.Normal, TextAlignmentOptions.Center);
+            CreateCardPanel(cardObject.transform, "Header", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 0f), new Vector2(0f, 78f), Color.white);
+            CreateCardPanel(cardObject.transform, "Badge", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0.5f, 0.5f), new Vector2(39f, -39f), new Vector2(50f, 30f), new Color(0f, 0f, 0f, 0.18f));
+            CreateText(cardObject.transform, "Icon", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(39f, -39f), new Vector2(46f, 24f), 14, FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(cardObject.transform, "Title", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(38f, -39f), new Vector2(-106f, 44f), 22, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+            CreateText(cardObject.transform, "Description", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(236f, 170f), 20, FontStyles.Normal, TextAlignmentOptions.Center);
+            FitTitleToHeader(cardObject.transform);
 
             for (int i = 0; i < 3; i++)
             {
                 CreateCardPanel(cardObject.transform, $"Gem_{i}", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f), new Vector2((i - 1) * 28f, 34f), new Vector2(18f, 18f), Color.gray);
             }
+        }
+
+        private GameObject CreateCardObject(Transform parent, int index)
+        {
+            if (cardPrefab != null)
+            {
+                GameObject instance = Instantiate(cardPrefab, parent, false);
+                instance.name = $"Card_{index}";
+                if (instance.GetComponent<Image>() == null)
+                {
+                    instance.AddComponent<Image>();
+                }
+
+                if (instance.GetComponent<Button>() == null)
+                {
+                    instance.AddComponent<Button>();
+                }
+
+                return instance;
+            }
+
+            return new GameObject($"Card_{index}", typeof(RectTransform), typeof(Image), typeof(Button));
         }
 
         private Image CreateCardPanel(Transform parent, string objectName, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition, Vector2 size, Color color)
@@ -327,6 +353,18 @@ namespace MergeAndMarch.UI
             text.textWrappingMode = TextWrappingModes.Normal;
             text.overflowMode = TextOverflowModes.Ellipsis;
             text.text = string.Empty;
+        }
+
+        private void FitTitleToHeader(Transform cardTransform)
+        {
+            RectTransform title = cardTransform.Find("Title")?.GetComponent<RectTransform>();
+            if (title == null)
+            {
+                return;
+            }
+
+            title.offsetMin = new Vector2(76f, title.offsetMin.y);
+            title.offsetMax = new Vector2(-14f, title.offsetMax.y);
         }
 
         private void ConfigureRarityGems(Transform cardTransform, CardRarity rarity)

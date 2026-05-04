@@ -19,7 +19,7 @@ namespace MergeAndMarch.Editor
 
             importer.textureType = TextureImporterType.Sprite;
             importer.spriteImportMode = SpriteImportMode.Single;
-            importer.spritePixelsPerUnit = 100f;
+            importer.spritePixelsPerUnit = GetPixelsPerUnit(assetPath);
             importer.filterMode = FilterMode.Bilinear;
             importer.textureCompression = TextureImporterCompression.Uncompressed;
             importer.mipmapEnabled = false;
@@ -33,6 +33,21 @@ namespace MergeAndMarch.Editor
             settings.spriteAlignment = (int)SpriteAlignment.Center;
             settings.spritePivot = new Vector2(0.5f, 0.5f);
             importer.SetTextureSettings(settings);
+        }
+
+        private static float GetPixelsPerUnit(string path)
+        {
+            if (path.StartsWith("Assets/_MergeAndMarch/Sprites/Troops/"))
+            {
+                return 1100f;
+            }
+
+            if (path.StartsWith("Assets/_MergeAndMarch/Sprites/Enemies/"))
+            {
+                return 1200f;
+            }
+
+            return 100f;
         }
     }
 }

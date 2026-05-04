@@ -16,18 +16,18 @@ MonoBehaviour:
   rows: 2
   cellSize: 1.15
   gridOffset: {x: -1.725, y: -3.6}
-  troopBaseScale: 0.1
-  tierTwoScale: 0.115
-  tierThreeScale: 0.13
-  slotVisualScale: 0.88
-  slotTint: {r: 1, g: 0.9725, b: 0.8784, a: 0.18}
+  troopBaseScale: 1
+  tierTwoScale: 1.15
+  tierThreeScale: 1.3
+  slotVisualScale: 0.61
+  slotTint: {r: 1, g: 1, b: 1, a: 0.3}
   tierTwoTint: {r: 1, g: 1, b: 1, a: 1}
   tierThreeTint: {r: 1, g: 0.95, b: 0.95, a: 1}
   laneGuideHeight: 5.8
   laneGuideWidthScale: 0.1
   laneGuideMarkerScale: 0.16
-  laneGuideTint: {r: 1, g: 0.9725, b: 0.8784, a: 0.13}
-  laneGuideMarkerTint: {r: 1, g: 0.9725, b: 0.8784, a: 0.16}
+  laneGuideTint: {r: 1, g: 1, b: 1, a: 0.16}
+  laneGuideMarkerTint: {r: 1, g: 1, b: 1, a: 0.18}
   tacticalSlowTimeScale: 0.2
   mergeSlideDuration: 0.15
   mergeFlashDuration: 0.1
@@ -35,7 +35,7 @@ MonoBehaviour:
   mergeOvershootScale: 1.3
   dragReturnDuration: 0.12
   swapMoveDuration: 0.12
-  enemyBaseScale: 0.1
+  enemyBaseScale: 1
   enemySpawnYOffset: 2.2
   enemyFailOffset: 0.8
   enemyEngageDistance: 0.3

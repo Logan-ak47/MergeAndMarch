@@ -15,8 +15,11 @@ namespace MergeAndMarch.Gameplay
         private static readonly Color HpBarGreen = new(0.2667f, 1f, 0.5333f, 1f);
         private static readonly Color HpBarYellow = new(1f, 0.8667f, 0.2667f, 1f);
         private static readonly Color HpBarRed = new(1f, 0.2667f, 0.2667f, 1f);
-        private static readonly Color DamageNumberColor = new(1f, 0.36f, 0.28f, 1f);
+        private static readonly Color DamageNumberColor = new(1f, 0.5333f, 0.5333f, 1f);
         private static readonly Color DeathArrowColor = new(1f, 0.12f, 0.12f, 0.95f);
+        private const float TierTwoGlowPadding = 0.035f;
+        private const float TierThreeGlowPadding = 0.045f;
+        private const float MergeHighlightPadding = 0.08f;
 
         [SerializeField] private SpriteRenderer spriteRenderer;
         [SerializeField] private BoxCollider2D boxCollider;
@@ -447,19 +450,19 @@ namespace MergeAndMarch.Gameplay
                 tierGlowRenderer.color = Tier == 3
                     ? new Color(1f, 0.92f, 0.66f, 0.9f)
                     : new Color(1f, 1f, 1f, 0.6f);
-                tierGlowRenderer.transform.localScale = Tier == 3 ? Vector3.one * 1.18f : Vector3.one * 1.1f;
                 tierGlowRenderer.transform.localPosition = new Vector3(0f, 0f, 0.05f);
             }
+            RefreshReadabilityChildScales();
             RefreshVisualSize();
         }
 
         private float ResolveTierVisualScale(GameConfig config)
         {
-            float requestedScale = Tier switch
+            float tierMultiplier = Tier switch
             {
                 2 => config.tierTwoScale,
                 3 => config.tierThreeScale,
-                _ => config.troopBaseScale
+                _ => 1f
             };
 
             Sprite tierOneSprite = Data.GetSpriteForTier(1);
@@ -469,7 +472,7 @@ namespace MergeAndMarch.Gameplay
                 : Mathf.Max(baseSpriteSize.x, baseSpriteSize.y);
             float currentSize = Mathf.Max(0.01f, Mathf.Max(baseSpriteSize.x, baseSpriteSize.y));
 
-            return requestedScale * Mathf.Max(0.01f, referenceSize) / currentSize;
+            return config.troopBaseScale * tierMultiplier * Mathf.Max(0.01f, referenceSize) / currentSize;
         }
 
         private void RefreshVisualSize()
@@ -480,6 +483,7 @@ namespace MergeAndMarch.Gameplay
             }
 
             baseScale = Vector3.one * currentSizeMultiplier * visualSizeBoost;
+            RefreshReadabilityChildScales();
             ApplyCurrentScale();
             ConfigureCollider();
         }
@@ -869,6 +873,36 @@ namespace MergeAndMarch.Gameplay
             }
 
             UpdateReadabilitySorting();
+        }
+
+        private void RefreshReadabilityChildScales()
+        {
+            if (spriteRenderer == null || spriteRenderer.sprite == null)
+            {
+                return;
+            }
+
+            if (mergeHighlightRenderer != null)
+            {
+                mergeHighlightRenderer.transform.localScale = ResolveChildPaddingScale(MergeHighlightPadding);
+                mergeHighlightRenderer.transform.localPosition = new Vector3(0f, 0f, 0.04f);
+                mergeHighlightBaseScale = mergeHighlightRenderer.transform.localScale;
+            }
+
+            if (tierGlowRenderer != null)
+            {
+                float glowPadding = Tier == 3 ? TierThreeGlowPadding : TierTwoGlowPadding;
+                tierGlowRenderer.transform.localScale = ResolveChildPaddingScale(glowPadding);
+                tierGlowRenderer.transform.localPosition = new Vector3(0f, 0f, 0.05f);
+            }
+        }
+
+        private Vector3 ResolveChildPaddingScale(float worldPadding)
+        {
+            float localSpriteSize = Mathf.Max(0.01f, Mathf.Max(spriteRenderer.sprite.bounds.size.x, spriteRenderer.sprite.bounds.size.y));
+            float worldSpriteSize = Mathf.Max(0.01f, localSpriteSize * currentSizeMultiplier);
+            float childScale = 1f + (worldPadding / worldSpriteSize);
+            return Vector3.one * Mathf.Clamp(childScale, 1.02f, 1.12f);
         }
 
         private void UpdateHPBar()
