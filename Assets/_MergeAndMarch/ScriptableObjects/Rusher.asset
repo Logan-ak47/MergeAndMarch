@@ -19,7 +19,10 @@ MonoBehaviour:
   baseAttack: 6
   moveSpeed: 2.8
   attackInterval: 1
-  sizeScale: 0.85
+  sizeScale: 1
   skipsFrontline: 0
   renderYOffset: 0
   sprite: {fileID: 21300000, guid: 0c8fa871a9925934f93fcc1f169267ee, type: 3}
+  beanBody: {fileID: 21300000, guid: 62fd5fe4723e1894aaa4d3e54ecbeb33, type: 3}
+  beanFlash: {fileID: 21300000, guid: dcac6dd08eef8f840a4ac06724a198a7, type: 3}
+  beanWings: {fileID: 0}

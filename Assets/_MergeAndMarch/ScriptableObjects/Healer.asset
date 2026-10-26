@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MergeAndMarch.Data.TroopData
   troopType: 3
   displayName: Healer
-  troopColor: {r: 1, g: 0.9843, b: 0.8784, a: 1}
+  troopColor: {r: 1, g: 0.43529412, b: 0.81960785, a: 1}
   baseHP: 60
   baseAttack: 0
   attackInterval: 3
@@ -25,3 +25,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: a7c30f13de55ec145995e22329d8fd45, type: 3}
   - {fileID: 21300000, guid: d719893d0e452c24387ff7a2e8628acb, type: 3}
   sprite: {fileID: 21300000, guid: aa2a41c04e641ad4598db7a09c2f5a30, type: 3}
+  beanBody: {fileID: 21300000, guid: 8cbc6447c325f0343963751d3e590064, type: 3}
+  beanProp: {fileID: 21300000, guid: 0118343999bbbec4eaf876a71bf95d5b, type: 3}
+  beanAccent: {fileID: 21300000, guid: a84e07cb05dc8084a933b41cdd813f95, type: 3}
+  beanFlash: {fileID: 21300000, guid: acdf5f1827f84474f81fc7a1545ed094, type: 3}

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MergeAndMarch.Data.TroopData
   troopType: 2
   displayName: Mage
-  troopColor: {r: 0.7333, g: 0.4196, b: 1, a: 1}
+  troopColor: {r: 0.6392157, g: 0.2784314, b: 1, a: 1}
   baseHP: 35
   baseAttack: 25
   attackInterval: 2.5
@@ -25,3 +25,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 869a66bce5096bf40aa8abc19161a301, type: 3}
   - {fileID: 21300000, guid: 2760afebaa75fd045af2dea4879e1828, type: 3}
   sprite: {fileID: 21300000, guid: 1f8553f0861ae4348b1f012e9d46fa2f, type: 3}
+  beanBody: {fileID: 21300000, guid: bd1b5c4c3453e2b40a6aa0017babce68, type: 3}
+  beanProp: {fileID: 21300000, guid: d062fda923f3c1342b0e2977442b4b48, type: 3}
+  beanAccent: {fileID: 21300000, guid: 9f2668028833a784888626c487974559, type: 3}
+  beanFlash: {fileID: 21300000, guid: dcff2699a47d79b44b472f70812ae174, type: 3}

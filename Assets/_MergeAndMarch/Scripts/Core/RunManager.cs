@@ -65,6 +65,8 @@ namespace MergeAndMarch.Core
 
         private void Awake()
         {
+            // Art bible 8.10: nothing set a frame-rate target, so Android ran at its 30 fps default.
+            Application.targetFrameRate = gameConfig != null ? gameConfig.targetFrameRate : 60;
             EnsureWaveManager();
         }
 

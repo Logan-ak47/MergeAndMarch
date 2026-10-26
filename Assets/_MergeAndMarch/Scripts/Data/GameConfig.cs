@@ -20,6 +20,13 @@ namespace MergeAndMarch.Data
         public Color tierTwoTint = new(1f, 1f, 1f, 1f);
         public Color tierThreeTint = new(1f, 0.95f, 0.95f, 1f);
 
+        [Header("Arena (art bible Sections 4 and 6)")]
+        public Color arenaTopColor = new(0.169f, 0.549f, 1f, 1f);
+        public Color arenaBottomColor = new(0.416f, 0.239f, 1f, 1f);
+
+        [Header("Platform")]
+        [Min(15)] public int targetFrameRate = 60;
+
         [Header("Lane Visuals")]
         [Min(0.1f)] public float laneGuideHeight = 5.8f;
         [Range(0.02f, 0.5f)] public float laneGuideWidthScale = 0.1f;

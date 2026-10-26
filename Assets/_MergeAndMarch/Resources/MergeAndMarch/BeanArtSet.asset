@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f4fc5da030441148883d2f949365333, type: 3}
+  m_Name: BeanArtSet
+  m_EditorClassIdentifier: Assembly-CSharp::MergeAndMarch.Data.BeanArtSet
+  allyIdle: {fileID: 21300000, guid: a1f95a96c3df5e045a5c9929c9e87e7d, type: 3}
+  allyBlink: {fileID: 21300000, guid: 8d596a803829f024399fd0bcb924e31c, type: 3}
+  allyAttack: {fileID: 21300000, guid: e88b3d2b334de224991768981ecb0e7f, type: 3}
+  allyHurt: {fileID: 21300000, guid: f1e99e9d62d00f14c9f44be1f4c19520, type: 3}
+  allyDizzy: {fileID: 21300000, guid: d34e197aa3ab5fe4ebcd3eca8bcbd07b, type: 3}
+  allyHappy: {fileID: 21300000, guid: af4dd3ae7e4786b428f928e004a67e84, type: 3}
+  enemyIdle: {fileID: 21300000, guid: 9f25d891c25af3842a34c2bbc5f430ce, type: 3}
+  enemyBlink: {fileID: 21300000, guid: 7cd853f298461c344a867d99c218573e, type: 3}
+  enemyHurt: {fileID: 21300000, guid: b93597f858243f64fb769a26fd71df9b, type: 3}
+  enemyDizzy: {fileID: 21300000, guid: 0e6a91c93aa8d9a41a10d5d0de0535c8, type: 3}
+  tierBadges:
+  - {fileID: 21300000, guid: f67bbd882796d5742846304d2d187a4e, type: 3}
+  - {fileID: 21300000, guid: beefdbc33759d664fb6faed1438fcc95, type: 3}
+  - {fileID: 21300000, guid: e6fa676ca2ad15340acba0c491824639, type: 3}
+  fxCircle: {fileID: 21300000, guid: 0048c2e885e841340a06ae518e6c9431, type: 3}
+  fxStar: {fileID: 21300000, guid: 1462f9db2861d904380e8f4d4a6e739f, type: 3}
+  fxSparkle: {fileID: 21300000, guid: 0e1bde9ded0f83445814590f1fa02f4d, type: 3}
+  fxConfetti: {fileID: 21300000, guid: feb5bd5a661fd744c98b8fcfa7f76e6d, type: 3}
+  fxChunk: {fileID: 21300000, guid: 5ae5313de24f23c458dc726430d616e3, type: 3}
+  fxRing: {fileID: 21300000, guid: c54fe0dcfb56b624eb1368732b5d0586, type: 3}
+  fxPuff: {fileID: 21300000, guid: 87cc53d62ac437c468e05a2d9af4f02e, type: 3}
+  fxRays: {fileID: 21300000, guid: e9f2aa86e2991094baa0bd24cd837930, type: 3}
+  fxGlow: {fileID: 21300000, guid: 1c032c2b1cbcfe442a73f3df2267ed80, type: 3}
+  fxShadow: {fileID: 21300000, guid: 701bb730aac0cac449ee6559b97d1a08, type: 3}
+  fxCoin: {fileID: 21300000, guid: abb15c631cea1e840a1bc998fa7684f9, type: 3}

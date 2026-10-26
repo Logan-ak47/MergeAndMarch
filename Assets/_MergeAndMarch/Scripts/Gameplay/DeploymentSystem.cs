@@ -123,6 +123,12 @@ namespace MergeAndMarch.Gameplay
                 yield break;
             }
 
+            if (troop.Bean != null)
+            {
+                yield return troop.PlayDeployPop();
+                yield break;
+            }
+
             Vector3 targetScale = troop.transform.localScale;
             float duration = 0.2f;
             float elapsed = 0f;

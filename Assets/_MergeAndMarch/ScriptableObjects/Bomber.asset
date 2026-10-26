@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MergeAndMarch.Data.TroopData
   troopType: 4
   displayName: Bomber
-  troopColor: {r: 1, g: 0.4784, b: 0.2392, a: 1}
+  troopColor: {r: 1, g: 0.47843137, b: 0, a: 1}
   baseHP: 20
   baseAttack: 80
   attackInterval: 999
@@ -25,3 +25,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: cc236503646ac63489b7c4e770dcf0eb, type: 3}
   - {fileID: 21300000, guid: 45f6bc452b1409048bcb0c93eb6701ab, type: 3}
   sprite: {fileID: 21300000, guid: cdcbaa4a86157d742bbddb1a9baf9543, type: 3}
+  beanBody: {fileID: 21300000, guid: e214ecd8970e0ac4eb002854ea25c81b, type: 3}
+  beanProp: {fileID: 21300000, guid: 9e9edd9be3c6800409a67d25414c7af2, type: 3}
+  beanAccent: {fileID: 21300000, guid: c66af5b5fdf50bd4993d8ff2d6875fa9, type: 3}
+  beanFlash: {fileID: 21300000, guid: 39928cc4c4bd2b5428acc79ea1e7aae4, type: 3}

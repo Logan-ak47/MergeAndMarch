@@ -42,6 +42,10 @@ namespace MergeAndMarch.Gameplay
         public bool IsSingleUse => Data != null && Data.troopType == TroopType.Bomber;
         public bool HasExplodedThisWave => hasExplodedThisWave;
 
+        /// <summary>The layered bean renderer, or null when the troop uses its legacy sprites.</summary>
+        public BeanVisual Bean => bean;
+
+        private BeanVisual bean;
         private Color baseColor;
         private int defaultSortingOrder;
         private GameConfig currentConfig;
@@ -109,17 +113,20 @@ namespace MergeAndMarch.Gameplay
             deathIndicatorSpawned = false;
 
             name = $"{troopData.displayName}_{column}_{row}";
+            defaultSortingOrder = spriteRenderer.sortingOrder;
 
-            Sprite tierSprite = troopData.GetSpriteForTier(Tier);
-            if (tierSprite != null)
+            if (!TrySetupBean(troopData))
             {
-                spriteRenderer.sprite = SpriteBackgroundCleaner.GetCleanedSprite(tierSprite);
+                Sprite tierSprite = troopData.GetSpriteForTier(Tier);
+                if (tierSprite != null)
+                {
+                    spriteRenderer.sprite = SpriteBackgroundCleaner.GetCleanedSprite(tierSprite);
+                }
             }
 
             CaptureBaseSpriteSize();
             spriteRenderer.color = baseColor;
             spriteRenderer.drawMode = SpriteDrawMode.Simple;
-            defaultSortingOrder = spriteRenderer.sortingOrder;
             ResolveReadabilityReferences();
             ApplyTierVisuals(config);
             ConfigureCollider();
@@ -167,6 +174,7 @@ namespace MergeAndMarch.Gameplay
         public void SetDragging(bool isDraggingNow)
         {
             isDragging = isDraggingNow;
+            bean?.SetDragging(isDraggingNow);
             if (spriteRenderer == null)
             {
                 return;
@@ -174,6 +182,121 @@ namespace MergeAndMarch.Gameplay
 
             spriteRenderer.sortingOrder = isDraggingNow ? 20 : defaultSortingOrder;
             UpdateReadabilitySorting();
+        }
+
+        /// <summary>White merge flash on the whole troop (art bible Section 2, merge resolve).</summary>
+        public void PlayMergeFlash(float duration)
+        {
+            if (bean != null)
+            {
+                bean.Flash(Color.white, duration);
+                return;
+            }
+
+            StartFlash(Color.white, duration);
+        }
+
+        /// <summary>Deploy pop-in: 0 to 1.2 to 1.0 with a landing squash and dust (art bible Section 2).</summary>
+        public IEnumerator PlayDeployPop()
+        {
+            if (bean == null)
+            {
+                yield break;
+            }
+
+            yield return bean.PlayDeployPop();
+            JuiceFx.Instance?.DeployDust(bean.FeetPosition);
+        }
+
+        /// <summary>
+        /// Removes a dead troop: a stretch-and-shrink death with X eyes and a poof for bean troops,
+        /// immediate destruction for legacy ones. The caller removes it from the grid first.
+        /// </summary>
+        public void Die()
+        {
+            if (bean == null)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            if (boxCollider != null)
+            {
+                boxCollider.enabled = false;
+            }
+
+            if (hpBarRoot != null)
+            {
+                hpBarRoot.SetActive(false);
+            }
+
+            StopAllCoroutines();
+            StartCoroutine(BeanDeathRoutine());
+        }
+
+        private IEnumerator BeanDeathRoutine()
+        {
+            JuiceFx fx = JuiceFx.Instance;
+            Sprite badge = bean.DetachBadge(out Vector3 badgePosition, out float badgeSize);
+            if (fx != null && badge != null)
+            {
+                fx.PopOff(badge, badgePosition, badgeSize);
+            }
+
+            yield return bean.PlayTroopDeath();
+            fx?.TroopDeathPoof(transform.position);
+            Destroy(gameObject);
+        }
+
+        private bool TrySetupBean(TroopData troopData)
+        {
+            if (!troopData.HasBeanArt)
+            {
+                return false;
+            }
+
+            if (bean == null)
+            {
+                JuiceFx fx = JuiceFx.Instance;
+                bean = BeanVisual.Create(
+                    transform,
+                    troopData.beanBody,
+                    troopData.beanProp,
+                    troopData.beanAccent,
+                    troopData.beanFlash,
+                    null,
+                    false,
+                    GetPropAction(troopData.troopType),
+                    fx != null ? fx.Config : null,
+                    fx != null ? fx.Art : null,
+                    spriteRenderer.sortingLayerName,
+                    defaultSortingOrder);
+            }
+
+            spriteRenderer.sprite = null;
+            spriteRenderer.enabled = false;
+            if (tierGlowRenderer != null)
+            {
+                tierGlowRenderer.enabled = false;
+            }
+
+            if (mergeHighlightRenderer != null)
+            {
+                mergeHighlightRenderer.gameObject.SetActive(false);
+            }
+
+            return true;
+        }
+
+        private static BeanPropAction GetPropAction(TroopType troopType)
+        {
+            return troopType switch
+            {
+                TroopType.Archer => BeanPropAction.Squeeze,
+                TroopType.Mage => BeanPropAction.Raise,
+                TroopType.Healer => BeanPropAction.Pulse,
+                _ => BeanPropAction.Jab
+            };
         }
 
         public void SetVisualSizeBoost(float boost)
@@ -191,6 +314,12 @@ namespace MergeAndMarch.Gameplay
         public void SetMergeHighlight(bool on)
         {
             isHighlighted = on;
+            if (bean != null)
+            {
+                bean.SetHighlighted(on);
+                return;
+            }
+
             if (mergeHighlightRenderer != null)
             {
                 mergeHighlightRenderer.gameObject.SetActive(on);
@@ -204,6 +333,12 @@ namespace MergeAndMarch.Gameplay
         public void SetDimmed(bool on)
         {
             isDimmed = on;
+            if (bean != null)
+            {
+                bean.SetAlpha(on ? 0.45f : 1f);
+                return;
+            }
+
             if (spriteRenderer == null)
             {
                 return;
@@ -279,12 +414,31 @@ namespace MergeAndMarch.Gameplay
             }
 
             currentHP = Mathf.Clamp(currentHP + Mathf.Max(0f, amount), 0f, MaxHP);
-            StartFlash(Color.Lerp(baseColor, Color.white, 0.55f), 0.12f);
+            if (bean != null)
+            {
+                bean.Flash(bean.Config.healMint, bean.Config.healFlashDuration, 0.6f);
+                bean.ShowFace(BeanFace.Happy, bean.Config.healFlashDuration * 2.5f);
+            }
+            else
+            {
+                StartFlash(Color.Lerp(baseColor, Color.white, 0.55f), 0.12f);
+            }
+
             UpdateHPBar();
         }
 
         public void PlayAttackFeedback(Vector3 targetWorldPosition)
         {
+            if (bean != null)
+            {
+                if (!isDragging)
+                {
+                    bean.PlayAttack(targetWorldPosition);
+                }
+
+                return;
+            }
+
             StartFlash(Color.Lerp(baseColor, Color.white, 0.45f), 0.08f);
 
             if (isDragging)
@@ -315,11 +469,24 @@ namespace MergeAndMarch.Gameplay
 
             float appliedDamage = Mathf.Max(0f, damage);
             currentHP = Mathf.Max(0f, currentHP - appliedDamage);
-            StartFlash(Color.white, 0.1f);
             UpdateHPBar();
-            if (appliedDamage > 0.01f)
+            if (bean != null)
             {
-                DamageNumber.Spawn(transform.position + (Vector3.up * 0.15f), appliedDamage, DamageNumberColor);
+                // Art bible Section 7: troop damage shows as a tint, squash and hurt face, never red numbers by the grid.
+                JuiceConfig juice = bean.Config;
+                bean.Tint(juice.troopHitTint, juice.troopHitTintDuration);
+                float squashY = juice.troopHitSquash;
+                bean.Squash(new Vector2(1f + ((1f - squashY) * 0.5f), squashY), juice.troopHitTintDuration * 0.5f, juice.troopHitTintDuration * 1.5f);
+                bean.ShowFace(BeanFace.Hurt, juice.troopHurtFaceDuration);
+                JuiceFx.Instance?.HitSparks(bean.CenterPosition, juice.enemyRed, juice.Count(juice.troopHitSparksMin, juice.troopHitSparksMax));
+            }
+            else
+            {
+                StartFlash(Color.white, 0.1f);
+                if (appliedDamage > 0.01f)
+                {
+                    DamageNumber.Spawn(transform.position + (Vector3.up * 0.15f), appliedDamage, DamageNumberColor);
+                }
             }
 
             bool died = !IsAlive;
@@ -395,7 +562,7 @@ namespace MergeAndMarch.Gameplay
 
                 if (Vector2.Distance(transform.position, enemy.transform.position) <= radius)
                 {
-                    enemy.ApplyDamage(damage);
+                    enemy.ApplyDamage(damage, this);
                 }
             }
 
@@ -429,6 +596,15 @@ namespace MergeAndMarch.Gameplay
                 return;
             }
 
+            if (bean != null)
+            {
+                // One sprite set for every tier; tier is a runtime scale plus badge, accent and glow.
+                currentSizeMultiplier = config.troopBaseScale * GetTierScale(config);
+                bean.SetTier(Tier);
+                RefreshVisualSize();
+                return;
+            }
+
             Sprite tierSprite = Data.GetSpriteForTier(Tier);
             if (tierSprite != null)
             {
@@ -456,14 +632,19 @@ namespace MergeAndMarch.Gameplay
             RefreshVisualSize();
         }
 
-        private float ResolveTierVisualScale(GameConfig config)
+        private float GetTierScale(GameConfig config)
         {
-            float tierMultiplier = Tier switch
+            return Tier switch
             {
                 2 => config.tierTwoScale,
                 3 => config.tierThreeScale,
                 _ => 1f
             };
+        }
+
+        private float ResolveTierVisualScale(GameConfig config)
+        {
+            float tierMultiplier = GetTierScale(config);
 
             Sprite tierOneSprite = Data.GetSpriteForTier(1);
             Sprite cleanedTierOneSprite = tierOneSprite != null ? SpriteBackgroundCleaner.GetCleanedSprite(tierOneSprite) : null;
@@ -614,7 +795,11 @@ namespace MergeAndMarch.Gameplay
         {
             hasExplodedThisWave = exploded;
 
-            if (spriteRenderer != null)
+            if (bean != null)
+            {
+                bean.SetAlpha(exploded ? 0.08f : 1f);
+            }
+            else if (spriteRenderer != null)
             {
                 Color color = spriteRenderer.color;
                 color.a = exploded ? 0.08f : 1f;
@@ -653,11 +838,26 @@ namespace MergeAndMarch.Gameplay
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / duration);
                 float alpha = Mathf.Lerp(startColor.a, 0.08f, t);
-                spriteRenderer.color = new Color(startColor.r, startColor.g, startColor.b, alpha);
+                if (bean != null)
+                {
+                    bean.SetAlpha(alpha);
+                }
+                else
+                {
+                    spriteRenderer.color = new Color(startColor.r, startColor.g, startColor.b, alpha);
+                }
+
                 yield return null;
             }
 
-            spriteRenderer.color = new Color(startColor.r, startColor.g, startColor.b, 0.08f);
+            if (bean != null)
+            {
+                bean.SetAlpha(0.08f);
+            }
+            else
+            {
+                spriteRenderer.color = new Color(startColor.r, startColor.g, startColor.b, 0.08f);
+            }
             bomberFadeRoutine = null;
         }
 
@@ -814,7 +1014,11 @@ namespace MergeAndMarch.Gameplay
 
         private void CaptureBaseSpriteSize()
         {
-            if (spriteRenderer != null && spriteRenderer.sprite != null)
+            if (Data != null && Data.HasBeanArt)
+            {
+                baseSpriteSize = Data.beanBody.bounds.size;
+            }
+            else if (spriteRenderer != null && spriteRenderer.sprite != null)
             {
                 baseSpriteSize = spriteRenderer.sprite.bounds.size;
             }
@@ -945,6 +1149,11 @@ namespace MergeAndMarch.Gameplay
 
         private void UpdateTierPulse()
         {
+            if (bean != null)
+            {
+                return;
+            }
+
             float targetPulse = Tier == 3 ? 1f + (Mathf.Sin(Time.unscaledTime * 2f) * 0.05f) : 1f;
             if (Mathf.Abs(targetPulse - tierPulseScale) < 0.0001f)
             {
@@ -966,6 +1175,8 @@ namespace MergeAndMarch.Gameplay
             {
                 return;
             }
+
+            bean?.SetSorting(spriteRenderer.sortingLayerName, spriteRenderer.sortingOrder);
 
             if (mergeHighlightRenderer != null)
             {

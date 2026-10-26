@@ -153,7 +153,7 @@ namespace MergeAndMarch.Gameplay
                 target.PlayImpactFeedback();
             }
 
-            target.ApplyDamage(damage);
+            target.ApplyDamage(damage, troop);
         }
 
         private bool TryResolveHealerPulse(Troop healer)
@@ -304,7 +304,7 @@ namespace MergeAndMarch.Gameplay
 
                 if (!didApplyDamage && t >= 0.2f)
                 {
-                    ApplyMageBandDamage(targetY, damage);
+                    ApplyMageBandDamage(troop, targetY, damage);
                     didApplyDamage = true;
                 }
 
@@ -313,7 +313,7 @@ namespace MergeAndMarch.Gameplay
 
             if (!didApplyDamage)
             {
-                ApplyMageBandDamage(targetY, damage);
+                ApplyMageBandDamage(troop, targetY, damage);
             }
 
             Destroy(wave);
@@ -351,7 +351,7 @@ namespace MergeAndMarch.Gameplay
 
             if (target != null && target.IsAlive)
             {
-                target.ApplyDamage(damage);
+                target.ApplyDamage(damage, troop);
             }
 
             Destroy(projectile);
@@ -437,7 +437,7 @@ namespace MergeAndMarch.Gameplay
             }
         }
 
-        private void ApplyMageBandDamage(float targetY, float damage)
+        private void ApplyMageBandDamage(Troop source, float targetY, float damage)
         {
             IReadOnlyList<Enemy> enemies = Enemy.ActiveEnemies;
             for (int i = 0; i < enemies.Count; i++)
@@ -453,7 +453,7 @@ namespace MergeAndMarch.Gameplay
                     continue;
                 }
 
-                enemy.ApplyDamage(damage);
+                enemy.ApplyDamage(damage, source);
             }
         }
 

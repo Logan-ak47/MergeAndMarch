@@ -16,6 +16,16 @@ namespace MergeAndMarch.Data
         public Sprite[] tierSprites = new Sprite[3];
         public Sprite sprite;
 
+        [Header("Bean art (art bible Section 5; one sprite set for all tiers)")]
+        public Sprite beanBody;
+        public Sprite beanProp;
+        [Tooltip("White overlay of the accessory region, tinted gold at tier 3.")]
+        public Sprite beanAccent;
+        [Tooltip("White silhouette used for hit flashes, the merge rim and the tier-3 glow.")]
+        public Sprite beanFlash;
+
+        public bool HasBeanArt => beanBody != null;
+
         public Sprite GetSpriteForTier(int tier)
         {
             int index = Mathf.Clamp(tier, 1, 3) - 1;

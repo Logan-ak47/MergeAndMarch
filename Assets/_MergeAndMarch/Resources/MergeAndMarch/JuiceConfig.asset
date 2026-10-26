@@ -1,0 +1,115 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4a4e0cc4e5ac0c419fdd8a489379311, type: 3}
+  m_Name: JuiceConfig
+  m_EditorClassIdentifier: Assembly-CSharp::MergeAndMarch.Data.JuiceConfig
+  reduceMotion: 0
+  screenShakeEnabled: 1
+  damageNumbersEnabled: 1
+  reducedMotionFlashCap: 0.3
+  referencePixelsPerUnit: 189.5
+  maxLiveEffects: 128
+  ink: {r: 0.114, g: 0.078, b: 0.259, a: 1}
+  gold: {r: 1, g: 0.761, b: 0.102, a: 1}
+  enemyRed: {r: 0.941, g: 0.157, b: 0.247, a: 1}
+  healMint: {r: 0.365, g: 1, b: 0.69, a: 1}
+  confettiColors:
+  - {r: 1, g: 0.761, b: 0.102, a: 1}
+  - {r: 0.184, g: 0.816, b: 1, a: 1}
+  - {r: 1, g: 0.435, b: 0.82, a: 1}
+  - {r: 0.094, g: 0.788, b: 0.392, a: 1}
+  - {r: 1, g: 1, b: 1, a: 1}
+  idleBobPercent: 0.03
+  idleBobPeriod: 1.2
+  idleBreathAmount: 0.03
+  blinkIntervalMin: 2
+  blinkIntervalMax: 5
+  blinkDuration: 0.1
+  marchTiltDegrees: 4
+  marchHopPeriod: 0.5
+  marchHopPercent: 0.04
+  rusherMarchRate: 2
+  flyerWingFlapDegrees: 15
+  attackAnticipation: {x: 0.9, y: 1.1}
+  attackAnticipationDuration: 0.06
+  attackRelease: {x: 1.1, y: 0.9}
+  attackReleaseDuration: 0.08
+  attackSettleDuration: 0.1
+  propJabPercent: 0.1
+  attackFaceDuration: 0.2
+  enemyHitFlashDuration: 0.05
+  enemyRecoilPercent: 0.07
+  enemyHitSquash: {x: 1.1, y: 0.9}
+  enemyHitSquashDuration: 0.08
+  hitSparksMin: 3
+  hitSparksMax: 5
+  hitSparkSpeed: 2.2
+  hitSparkLifetime: 0.25
+  hitSparkSize: 0.12
+  damageNumberPopScale: 1.3
+  damageNumberPopDuration: 0.12
+  damageNumberRisePx: 30
+  damageNumberLifetime: 0.5
+  damageNumbersMaxOnScreen: 12
+  damageNumberTierThreeScale: 1.3
+  damageNumberFontSize: 40
+  enemyDeathSquash: {x: 1.3, y: 0.6}
+  enemyDeathSquashDuration: 0.08
+  enemyDeathChunksMin: 6
+  enemyDeathChunksMax: 8
+  enemyDeathChunkSpeed: 3
+  enemyDeathChunkLifetime: 0.35
+  tankDeathShakePx: 2
+  tankDeathShakeDuration: 0.08
+  troopHitTint: {r: 1, g: 0.45, b: 0.5, a: 1}
+  troopHitTintDuration: 0.06
+  troopHitSquash: 0.92
+  troopHurtFaceDuration: 0.15
+  troopHitSparksMin: 2
+  troopHitSparksMax: 3
+  troopDeathStretch: 1.2
+  troopDeathDuration: 0.2
+  troopDeathShakePx: 3
+  troopDeathShakeDuration: 0.12
+  dragPickupScale: 1.15
+  dragWobbleDegrees: 6
+  dragWobbleFrequency: 3
+  dragShadowGrow: 1.4
+  highlightRimScale: 1.08
+  highlightPulsePeriod: 0.3
+  mergePullDuration: 0.08
+  mergeFlashDuration: 0.12
+  mergeSpawnScale: 0.6
+  mergeOvershoot: 1.25
+  mergeSettleDuration: 0.22
+  mergeConfettiMin: 16
+  mergeConfettiMax: 24
+  mergeConfettiSpeed: 4
+  mergeConfettiLifetime: 0.55
+  mergeHitStop: 0.06
+  mergeShakePx: 4
+  mergeShakeDuration: 0.15
+  mergeTierTwoLabel: TIER 2!
+  tierThreeOvershoot: 1.35
+  tierThreeSecondBounce: 1.08
+  tierThreeHitStop: 0.1
+  tierThreeShakePx: 6
+  tierThreeShakeDuration: 0.2
+  tierThreeRaysDuration: 0.4
+  tierThreeGlowAlpha: 0.55
+  tierThreeGlowScale: 1.12
+  mergeTierThreeLabel: TIER 3!
+  deployPeakScale: 1.2
+  deployDuration: 0.18
+  deployLandSquash: {x: 1.15, y: 0.85}
+  deployLandDuration: 0.1
+  healFlashDuration: 0.12

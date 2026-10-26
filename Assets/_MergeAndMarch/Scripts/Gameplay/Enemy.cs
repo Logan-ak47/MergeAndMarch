@@ -40,6 +40,7 @@ namespace MergeAndMarch.Gameplay
         private Vector3 lanePosition;
         private Vector3 configuredScale = Vector3.one;
         private float moveSpeed = 1f;
+        private BeanVisual bean;
         public EnemyData Data { get; private set; }
         public int LaneColumn { get; private set; }
         public float MaxHP => maxHP;
@@ -87,6 +88,7 @@ namespace MergeAndMarch.Gameplay
             }
 
             Troop blockingTroop = FindBlockingTroop();
+            bean?.SetMarching(blockingTroop == null);
             if (blockingTroop == null)
             {
                 MoveForward();
@@ -100,7 +102,15 @@ namespace MergeAndMarch.Gameplay
             }
 
             attackTimer = Data.attackInterval;
-            StartFlash(Color.Lerp(Data.tintColor, Color.white, 0.35f), 0.08f);
+            if (bean != null)
+            {
+                bean.PlayAttack(blockingTroop.transform.position);
+            }
+            else
+            {
+                StartFlash(Color.Lerp(Data.tintColor, Color.white, 0.35f), 0.08f);
+            }
+
             StartAttackPulse(blockingTroop.transform.position);
             SpawnAttackImpact(blockingTroop);
 
@@ -109,7 +119,7 @@ namespace MergeAndMarch.Gameplay
             if (troopDied)
             {
                 battleGrid.RemoveTroop(blockingTroop);
-                Destroy(blockingTroop.gameObject);
+                blockingTroop.Die();
             }
         }
 
@@ -179,7 +189,11 @@ namespace MergeAndMarch.Gameplay
             transform.position = visualSpawnPos;
             lanePosition = transform.position;
 
-            if (spriteRenderer != null && Data != null)
+            if (spriteRenderer != null && Data != null && Data.HasBeanArt)
+            {
+                SetupBean();
+            }
+            else if (spriteRenderer != null && Data != null)
             {
                 bool hasArtSprite = Data.sprite != null;
                 spriteRenderer.sprite = hasArtSprite ? SpriteBackgroundCleaner.GetCleanedSprite(Data.sprite) : GetFallbackSprite();
@@ -199,7 +213,13 @@ namespace MergeAndMarch.Gameplay
             UpdateHPBar();
         }
 
-        public bool ApplyDamage(float damage)
+        /// <summary>
+        /// Applies damage and plays the hit recipe (art bible Section 2: white flash, recoil,
+        /// squash, sparks in the attacker's colour, damage number). Returns true if the enemy died.
+        /// </summary>
+        /// <param name="damage">Damage to apply.</param>
+        /// <param name="source">The troop that dealt it, if any; tints sparks and enlarges tier-3 numbers.</param>
+        public bool ApplyDamage(float damage, Troop source = null)
         {
             if (!IsAlive)
             {
@@ -208,11 +228,20 @@ namespace MergeAndMarch.Gameplay
 
             float appliedDamage = Mathf.Max(0f, damage);
             currentHP = Mathf.Max(0f, currentHP - appliedDamage);
-            StartFlash(Color.white, 0.1f);
             UpdateHPBar();
+            if (bean != null)
+            {
+                PlayBeanHit(source);
+            }
+            else
+            {
+                StartFlash(Color.white, 0.1f);
+            }
+
             if (appliedDamage > 0.01f)
             {
-                DamageNumber.Spawn(transform.position + (Vector3.up * 0.15f), appliedDamage, Color.white);
+                bool emphasised = source != null && source.Tier >= 3;
+                DamageNumber.Spawn(transform.position + (Vector3.up * 0.15f), appliedDamage, Color.white, emphasised);
             }
             if (!IsAlive)
             {
@@ -226,7 +255,8 @@ namespace MergeAndMarch.Gameplay
 
         public void PlayImpactFeedback()
         {
-            if (isDying || spriteRenderer == null)
+            // Bean enemies play their impact as part of the hit recipe in ApplyDamage.
+            if (isDying || spriteRenderer == null || bean != null)
             {
                 return;
             }
@@ -353,7 +383,54 @@ namespace MergeAndMarch.Gameplay
                 impactRoutine = null;
             }
 
-            deathRoutine = StartCoroutine(DeathRoutine());
+            deathRoutine = StartCoroutine(bean != null ? BeanDeathRoutine() : DeathRoutine());
+        }
+
+        private void SetupBean()
+        {
+            spriteRenderer.sprite = null;
+            spriteRenderer.enabled = false;
+            if (bean == null)
+            {
+                JuiceFx fx = JuiceFx.Instance;
+                bean = BeanVisual.Create(
+                    transform,
+                    Data.beanBody,
+                    null,
+                    null,
+                    Data.beanFlash,
+                    Data.beanWings,
+                    true,
+                    BeanPropAction.Jab,
+                    fx != null ? fx.Config : null,
+                    fx != null ? fx.Art : null,
+                    "Enemies",
+                    0);
+            }
+
+            JuiceConfig juice = bean.Config;
+            bean.SetMarchRate(Data.enemyType == EnemyType.Rusher ? juice.rusherMarchRate : 1f);
+            bean.SetMarching(true);
+            baseSpriteSize = Data.beanBody.bounds.size;
+        }
+
+        private void PlayBeanHit(Troop source)
+        {
+            JuiceConfig juice = bean.Config;
+            bean.Flash(Color.white, juice.enemyHitFlashDuration);
+            bean.Recoil(Vector3.up, juice.enemyRecoilPercent * bean.BodyHeight, juice.enemyHitSquashDuration);
+            bean.Squash(juice.enemyHitSquash, juice.enemyHitSquashDuration * 0.4f, juice.enemyHitSquashDuration * 0.6f);
+            bean.ShowFace(BeanFace.Hurt, juice.troopHurtFaceDuration);
+            Color sparkColor = source != null && source.Data != null ? source.Data.troopColor : Color.white;
+            JuiceFx.Instance?.HitSparks(bean.CenterPosition, sparkColor, juice.Count(juice.hitSparksMin, juice.hitSparksMax));
+        }
+
+        private IEnumerator BeanDeathRoutine()
+        {
+            yield return bean.PlayEnemyDeath();
+            Color chunkColor = Data != null && Data.enemyType == EnemyType.Tank ? new Color(0.702f, 0.071f, 0.247f, 1f) : bean.Config.enemyRed;
+            JuiceFx.Instance?.EnemyDeathBurst(transform.position, chunkColor, Data != null && Data.enemyType == EnemyType.Tank);
+            Destroy(gameObject);
         }
 
         private void SpawnAttackImpact(Troop target)

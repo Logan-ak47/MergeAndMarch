@@ -9,6 +9,8 @@ namespace MergeAndMarch.Gameplay
         private static Sprite runtimeSquareSprite;
         private static Sprite runtimeSlotOutlineSprite;
         private static Sprite runtimeBackgroundGradientSprite;
+        private static Color runtimeBackgroundTop;
+        private static Color runtimeBackgroundBottom;
 
         [SerializeField] private GameConfig config;
         [SerializeField] private Transform slotVisualRoot;
@@ -429,14 +431,23 @@ namespace MergeAndMarch.Gameplay
                 backgroundRenderer = background.AddComponent<SpriteRenderer>();
             }
 
-            float height = camera.orthographicSize * 2f;
+            // A little oversized so screen shake never reveals the camera's clear colour.
+            float height = camera.orthographicSize * 2f * 1.1f;
             float width = height * camera.aspect;
-            backgroundRenderer.sprite = GetRuntimeBackgroundGradientSprite();
+            backgroundRenderer.sprite = config != null
+                ? GetRuntimeBackgroundGradientSprite(config.arenaTopColor, config.arenaBottomColor)
+                : GetRuntimeBackgroundGradientSprite(new Color(0.051f, 0.051f, 0.102f, 1f), new Color(0.122f, 0.122f, 0.208f, 1f));
             backgroundRenderer.color = Color.white;
             backgroundRenderer.sortingLayerName = "Background";
             backgroundRenderer.sortingOrder = -100;
             backgroundRenderer.transform.localPosition = new Vector3(0f, 0f, 20f);
-            backgroundRenderer.transform.localScale = new Vector3(width, height, 1f);
+
+            // The gradient sprite is 1 px wide, so scale by its real bounds rather than assuming 1 unit.
+            Vector3 spriteSize = backgroundRenderer.sprite.bounds.size;
+            backgroundRenderer.transform.localScale = new Vector3(
+                width / Mathf.Max(0.0001f, spriteSize.x),
+                height / Mathf.Max(0.0001f, spriteSize.y),
+                1f);
         }
 
         private void UpdateSlotVisuals()
@@ -447,7 +458,7 @@ namespace MergeAndMarch.Gameplay
             }
 
             float pulse = 0.5f + (Mathf.Sin(Time.time * (Mathf.PI * 2f / 1.5f)) * 0.5f);
-            float alpha = Mathf.Lerp(0.2f, 0.35f, pulse);
+            float alpha = Mathf.Lerp(config.slotTint.a * 0.85f, config.slotTint.a * 1.15f, pulse);
             for (int column = 0; column < config.columns; column++)
             {
                 for (int row = 0; row < config.rows; row++)
@@ -609,17 +620,21 @@ namespace MergeAndMarch.Gameplay
             return runtimeSlotOutlineSprite;
         }
 
-        private static Sprite GetRuntimeBackgroundGradientSprite()
+        /// <summary>Arena gradient (art bible Sections 4 and 6), rebuilt if the configured colours change.</summary>
+        private static Sprite GetRuntimeBackgroundGradientSprite(Color top, Color bottom)
         {
-            if (runtimeBackgroundGradientSprite != null)
+            if (runtimeBackgroundGradientSprite != null && runtimeBackgroundTop == top && runtimeBackgroundBottom == bottom)
             {
                 return runtimeBackgroundGradientSprite;
             }
 
+            runtimeBackgroundTop = top;
+            runtimeBackgroundBottom = bottom;
             const int height = 512;
-            Texture2D texture = new(1, height, TextureFormat.RGBA32, false);
-            Color top = new(0.051f, 0.051f, 0.102f, 1f);
-            Color bottom = new(0.122f, 0.122f, 0.208f, 1f);
+            Texture2D texture = new(1, height, TextureFormat.RGBA32, false)
+            {
+                wrapMode = TextureWrapMode.Clamp
+            };
             for (int y = 0; y < height; y++)
             {
                 float t = y / (height - 1f);

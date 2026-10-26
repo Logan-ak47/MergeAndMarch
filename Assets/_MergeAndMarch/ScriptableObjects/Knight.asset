@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MergeAndMarch.Data.TroopData
   troopType: 0
   displayName: Knight
-  troopColor: {r: 0.2667, g: 0.5333, b: 1, a: 1}
+  troopColor: {r: 0.18431373, g: 0.41960785, b: 1, a: 1}
   baseHP: 100
   baseAttack: 15
   attackInterval: 2
@@ -25,3 +25,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 2117c81dc36694546875832ce19891a4, type: 3}
   - {fileID: 21300000, guid: 5afc48181d17c9b4c9ef0ab6eb3f0d88, type: 3}
   sprite: {fileID: 21300000, guid: dd241c10b5b4d8f4cb4cbb3e3694524b, type: 3}
+  beanBody: {fileID: 21300000, guid: 1823029a82a812f49a8f8bd1d09088ce, type: 3}
+  beanProp: {fileID: 21300000, guid: 812b6b865f2ac68449f1d8f426ff419a, type: 3}
+  beanAccent: {fileID: 21300000, guid: 11aa605f2dc831d4896c24ddd47849e4, type: 3}
+  beanFlash: {fileID: 21300000, guid: d376f3a214a4ad14b81fc99a23e15bd0, type: 3}

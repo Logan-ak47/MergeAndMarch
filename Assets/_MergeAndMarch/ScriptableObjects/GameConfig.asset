@@ -17,16 +17,19 @@ MonoBehaviour:
   cellSize: 1.15
   gridOffset: {x: -1.725, y: -3.6}
   troopBaseScale: 1
-  tierTwoScale: 1.15
-  tierThreeScale: 1.3
+  tierTwoScale: 1.18
+  tierThreeScale: 1.38
   slotVisualScale: 0.61
-  slotTint: {r: 1, g: 1, b: 1, a: 0.3}
+  slotTint: {r: 1, g: 1, b: 1, a: 0.22}
   tierTwoTint: {r: 1, g: 1, b: 1, a: 1}
   tierThreeTint: {r: 1, g: 0.95, b: 0.95, a: 1}
+  arenaTopColor: {r: 0.169, g: 0.549, b: 1, a: 1}
+  arenaBottomColor: {r: 0.416, g: 0.239, b: 1, a: 1}
+  targetFrameRate: 60
   laneGuideHeight: 5.8
   laneGuideWidthScale: 0.1
   laneGuideMarkerScale: 0.16
-  laneGuideTint: {r: 1, g: 1, b: 1, a: 0.16}
+  laneGuideTint: {r: 1, g: 1, b: 1, a: 0.12}
   laneGuideMarkerTint: {r: 1, g: 1, b: 1, a: 0.18}
   tacticalSlowTimeScale: 0.2
   mergeSlideDuration: 0.15

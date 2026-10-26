@@ -73,3 +73,26 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# === AI studio tooling and its docs (local only, not part of the game) ===
+/.claude/
+/CLAUDE.md
+/CLAUDE.local.md
+/UPGRADING.md
+/project.yaml
+/project.local.yaml
+/.worktreeinclude
+/design/
+/docs/
+/production/
+/studio-tests/
+/src/
+/.scratch/
+
+# === Unrelated local test files ===
+/[Aa]ssets/Resources/location.json
+/[Aa]ssets/Resources/location.json.meta
+/[Aa]ssets/Scripts/movecubes.cs
+/[Aa]ssets/Scripts/movecubes.cs.meta
+/[Aa]ssets/test.unity
+/[Aa]ssets/test.unity.meta

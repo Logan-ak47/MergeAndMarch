@@ -23,3 +23,6 @@ MonoBehaviour:
   skipsFrontline: 0
   renderYOffset: 0
   sprite: {fileID: 21300000, guid: f1c5ce90c2160fb4ca8cec809229aedd, type: 3}
+  beanBody: {fileID: 21300000, guid: a79c77d6317ba854d8155c880a73c364, type: 3}
+  beanFlash: {fileID: 21300000, guid: 667cedd8038b3d94d92f4af33839f9f0, type: 3}
+  beanWings: {fileID: 0}

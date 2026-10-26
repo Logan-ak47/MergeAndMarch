@@ -16,5 +16,14 @@ namespace MergeAndMarch.Data
         public bool skipsFrontline;
         public float renderYOffset;
         public Sprite sprite;
+
+        [Header("Bean art (art bible Section 5)")]
+        public Sprite beanBody;
+        [Tooltip("White silhouette used for hit flashes.")]
+        public Sprite beanFlash;
+        [Tooltip("Flyer only: wing sprite drawn behind the body.")]
+        public Sprite beanWings;
+
+        public bool HasBeanArt => beanBody != null;
     }
 }
