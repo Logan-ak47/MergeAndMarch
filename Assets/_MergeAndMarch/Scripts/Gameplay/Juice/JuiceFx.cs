@@ -20,8 +20,12 @@ namespace MergeAndMarch.Gameplay
         private const string EffectsLayer = "Effects";
         private const string BehindUnitsLayer = "Grid";
 
+        private const string DimLayer = "Troops";
+        private const int DimOrder = 10;
+
         private static JuiceFx instance;
         private static bool isQuitting;
+        private static Sprite whiteSprite;
 
         [SerializeField] private JuiceConfig config;
         [SerializeField] private BeanArtSet art;
@@ -34,6 +38,12 @@ namespace MergeAndMarch.Gameplay
         private Vector3 lastShakeOffset;
         private Vector3 lastCameraPosition;
         private bool hasLastCameraPosition;
+        private SpriteRenderer slowMoDim;
+        private SpriteRenderer slowMoVignette;
+        private SpriteRenderer slowMoIcon;
+        private bool slowMoActive;
+        private float slowMoBlend;
+        private Color[] bomberPalette;
 
         private sealed class Effect
         {
@@ -121,6 +131,7 @@ namespace MergeAndMarch.Gameplay
 
         private void Update()
         {
+            UpdateSlowMoOverlay();
             for (int i = active.Count - 1; i >= 0; i--)
             {
                 Effect effect = active[i];
@@ -392,6 +403,221 @@ namespace MergeAndMarch.Gameplay
 
             string label = tierThree ? config.mergeTierThreeLabel : config.mergeTierTwoLabel;
             StartCoroutine(SpawnLabelAfter(0.12f, position + (Vector3.up * 0.75f), label, tierThree ? config.gold : Color.white));
+        }
+
+        /// <summary>
+        /// Drag slow-mo overlay (art bible Sections 2 and 7): an ink dim and vignette between the
+        /// troops and the focus layer, so the dragged troop and its merge partners stay bright,
+        /// plus an hourglass icon under the HUD row.
+        /// </summary>
+        public void SetSlowMo(bool isActive)
+        {
+            slowMoActive = isActive;
+            if (isActive)
+            {
+                EnsureSlowMoOverlay();
+            }
+        }
+
+        /// <summary>Knight melee: a crescent slash on the target, angled away from the attacker.</summary>
+        public void KnightSlash(Vector3 targetPosition, Vector3 attackerPosition, Color color)
+        {
+            if (art == null)
+            {
+                return;
+            }
+
+            Vector3 direction = targetPosition - attackerPosition;
+            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+            Color tint = Color.Lerp(Color.white, color, 0.3f);
+            Spawn(art.fxSlash, targetPosition, tint, config.knightSlashStartSize, config.knightSlashEndSize, config.knightSlashDuration, 0f, default, 0f, 0f, false, EffectsLayer, 20, 0.3f, angle);
+        }
+
+        /// <summary>Archer release: a white pop and two sparks at the bow.</summary>
+        public void MuzzlePop(Vector3 position, Color color)
+        {
+            if (art == null)
+            {
+                return;
+            }
+
+            Spawn(art.fxCircle, position, Color.white, 0.1f, config.muzzlePopSize, 0.08f, 0f, default, 0f, 0f, false, EffectsLayer, 18);
+            Burst(art.fxSparkle, position, null, color, 2, config.hitSparkSpeed * 0.6f, 0.18f, config.hitSparkSize * 0.8f, 0f, false, true, 18);
+        }
+
+        /// <summary>One puff of a projectile trail; call once per frame of flight.</summary>
+        public void ProjectileTrail(Vector3 position, Color color)
+        {
+            if (art == null)
+            {
+                return;
+            }
+
+            color.a = 0.7f;
+            Spawn(art.fxCircle, position, color, 0.14f, 0.03f, 0.15f, 0f, default, 0f, 0f, false, EffectsLayer, 4);
+        }
+
+        /// <summary>Healer pulse: a mint ring from the healer and sparkles rising from the healed troop.</summary>
+        public void HealRing(Vector3 healerPosition, Vector3 targetPosition)
+        {
+            if (art == null)
+            {
+                return;
+            }
+
+            Spawn(art.fxRing, healerPosition, config.healMint, 0.15f, config.healRingSize, config.healRingDuration, 0f, default, 0f, 0f, false, EffectsLayer, 6);
+            int count = config.Count(4, 6);
+            for (int i = 0; i < count; i++)
+            {
+                Vector3 velocity = new(Random.Range(-0.4f, 0.4f), Random.Range(1f, 1.6f), 0f);
+                Vector3 offset = new(Random.Range(-0.25f, 0.25f), Random.Range(0f, 0.3f), 0f);
+                Spawn(art.fxSparkle, targetPosition + offset, config.healMint, 0.16f, 0.06f, 0.45f, 0f, velocity, 0f, Random.Range(-180f, 180f), false, EffectsLayer, 17, 0.5f);
+            }
+        }
+
+        /// <summary>Bomber explosion: orange blast, hot core, ring, puff, chunks and shake.</summary>
+        public void BomberBlast(Vector3 position, float radius)
+        {
+            if (art == null)
+            {
+                return;
+            }
+
+            bomberPalette ??= new[] { config.bomberBlastColor, config.bomberBlastCore, Color.white };
+            Color blast = config.bomberBlastColor;
+            blast.a = config.FlashAlpha(0.85f);
+            Color core = config.bomberBlastCore;
+            core.a = config.FlashAlpha(0.95f);
+            Spawn(art.fxCircle, position, blast, 0.2f, radius * 2f, 0.3f, 0f, default, 0f, 0f, false, EffectsLayer, 24);
+            Spawn(art.fxCircle, position, core, 0.1f, radius * 1.1f, 0.22f, 0f, default, 0f, 0f, false, EffectsLayer, 25);
+            Spawn(art.fxRing, position, config.bomberBlastCore, 0.3f, radius * 2.2f, 0.3f, 0f, default, 0f, 0f, false, EffectsLayer, 26);
+            Spawn(art.fxPuff, position, new Color(1f, 1f, 1f, 0.7f), 0.4f, radius * 1.2f, 0.35f, 0f, default, 0f, 0f, false, EffectsLayer, 23);
+            Burst(art.fxChunk, position, bomberPalette, config.bomberBlastColor, config.Count(8, 12), 4f, 0.4f, 0.14f, -8f, false, true, 27);
+            Shake(config.bomberShakePx, config.bomberShakeDuration);
+        }
+
+        /// <summary>Boss entrance: the biggest shake in the game, a dust ring and a "BOSS!" banner.</summary>
+        public void BossEntrance(Vector3 position)
+        {
+            if (art == null)
+            {
+                return;
+            }
+
+            Shake(config.bossEntranceShakePx, config.bossEntranceShakeDuration);
+            Spawn(art.fxRing, position, Color.white, 0.5f, 3f, 0.35f);
+            Spawn(art.fxPuff, position, new Color(1f, 1f, 1f, 0.8f), 0.6f, 2.2f, 0.4f);
+            StartCoroutine(SpawnLabelAfter(0.1f, position + (Vector3.up * 1.4f), config.bossLabel, config.enemyRed));
+        }
+
+        /// <summary>An enemy hit the base: red burst, shake and a red "-N" number.</summary>
+        public void BaseHit(Vector3 position, float damage)
+        {
+            if (art != null)
+            {
+                Spawn(art.fxRing, position, config.enemyRed, 0.3f, 1.3f, 0.25f);
+                Burst(art.fxChunk, position, null, config.enemyRed, config.Count(5, 7), 3f, 0.35f, 0.13f, -6f, false, true);
+            }
+
+            Shake(config.baseHitShakePx, config.baseHitShakeDuration);
+            DamageNumber.SpawnLabel(position + (Vector3.up * 0.4f), "-" + Mathf.RoundToInt(damage), config.enemyRed, 1.4f);
+        }
+
+        /// <summary>Run lost: a heavy shake on the defeat moment.</summary>
+        public void DefeatShake()
+        {
+            Shake(config.defeatShakePx, config.defeatShakeDuration);
+        }
+
+        private void EnsureSlowMoOverlay()
+        {
+            if (slowMoDim != null)
+            {
+                return;
+            }
+
+            Camera mainCamera = Camera.main;
+            if (mainCamera == null)
+            {
+                return;
+            }
+
+            GameObject root = new("SlowMoOverlay");
+            root.transform.SetParent(mainCamera.transform, false);
+            root.transform.localPosition = new Vector3(0f, 0f, 10f);
+            slowMoDim = CreateOverlayLayer(root.transform, "Dim", GetWhiteSprite(), DimLayer, DimOrder);
+            slowMoVignette = CreateOverlayLayer(root.transform, "Vignette", art != null ? art.fxVignette : null, DimLayer, DimOrder + 1);
+            slowMoIcon = CreateOverlayLayer(root.transform, "Hourglass", art != null ? art.iconHourglass : null, EffectsLayer, 40);
+        }
+
+        private static SpriteRenderer CreateOverlayLayer(Transform parent, string layerName, Sprite sprite, string sortingLayer, int order)
+        {
+            GameObject layer = new(layerName);
+            layer.transform.SetParent(parent, false);
+            SpriteRenderer renderer = layer.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.sortingLayerName = sortingLayer;
+            renderer.sortingOrder = order;
+            renderer.enabled = false;
+            return renderer;
+        }
+
+        private void UpdateSlowMoOverlay()
+        {
+            if (slowMoDim == null)
+            {
+                return;
+            }
+
+            float fade = slowMoActive ? config.slowMoFadeIn : config.slowMoFadeOut;
+            slowMoBlend = Mathf.MoveTowards(slowMoBlend, slowMoActive ? 1f : 0f, Time.unscaledDeltaTime / Mathf.Max(0.01f, fade));
+            bool visible = slowMoBlend > 0.001f;
+            slowMoDim.enabled = visible;
+            slowMoVignette.enabled = visible && slowMoVignette.sprite != null;
+            slowMoIcon.enabled = visible && slowMoIcon.sprite != null;
+            Camera mainCamera = Camera.main;
+            if (!visible || mainCamera == null)
+            {
+                return;
+            }
+
+            float height = mainCamera.orthographicSize * 2f;
+            float width = height * mainCamera.aspect;
+            SizeTo(slowMoDim, width * 1.2f, height * 1.2f);
+            SizeTo(slowMoVignette, width * 1.05f, height * 1.05f);
+            slowMoDim.color = new Color(config.ink.r, config.ink.g, config.ink.b, config.slowMoDimAlpha * slowMoBlend);
+            slowMoVignette.color = new Color(config.ink.r, config.ink.g, config.ink.b, config.slowMoVignetteAlpha * slowMoBlend);
+
+            if (slowMoIcon.enabled)
+            {
+                float iconSize = config.PxToWorld(config.slowMoIconPx) * (1f + (Mathf.Sin(Time.unscaledTime * 6f) * 0.06f));
+                SizeTo(slowMoIcon, iconSize, iconSize);
+                slowMoIcon.transform.localPosition = new Vector3(0f, (height * 0.5f) - config.PxToWorld(config.slowMoIconTopPx), 0f);
+                slowMoIcon.color = new Color(1f, 1f, 1f, slowMoBlend);
+            }
+        }
+
+        private static void SizeTo(SpriteRenderer renderer, float width, float height)
+        {
+            if (renderer.sprite == null)
+            {
+                return;
+            }
+
+            Vector3 size = renderer.sprite.bounds.size;
+            renderer.transform.localScale = new Vector3(width / Mathf.Max(0.0001f, size.x), height / Mathf.Max(0.0001f, size.y), 1f);
+        }
+
+        private static Sprite GetWhiteSprite()
+        {
+            if (whiteSprite == null)
+            {
+                Texture2D texture = Texture2D.whiteTexture;
+                whiteSprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), texture.width);
+                whiteSprite.name = "JuiceWhite";
+            }
+
+            return whiteSprite;
         }
 
         private IEnumerator SpawnLabelAfter(float delay, Vector3 position, string label, Color color)

@@ -103,6 +103,7 @@ namespace MergeAndMarch.Gameplay
             }
 
             HighlightMergeTargets(draggedTroop);
+            JuiceFx.Instance?.SetSlowMo(true);
         }
 
         private void UpdateDrag(Vector3 worldPosition)
@@ -124,6 +125,7 @@ namespace MergeAndMarch.Gameplay
 
             ClearAllHighlights();
             draggedTroop.SetDragging(false);
+            JuiceFx.Instance?.SetSlowMo(false);
 
             if (!battleGrid.TryGetNearestSlot(worldPosition, out int targetColumn, out int targetRow))
             {
@@ -202,16 +204,31 @@ namespace MergeAndMarch.Gameplay
             JuiceFx fx = JuiceFx.Instance;
             JuiceConfig juice = fx != null ? fx.Config : null;
 
+            int sourceColumn = source.Column;
+            int sourceRow = source.Row;
             battleGrid.RemoveTroop(source);
             source.SetGridPosition(source.transform.position, -1, -1);
 
             Vector3 targetPosition = battleGrid.GetSlotWorldPosition(target.Column, target.Row);
             yield return AnimateMove(source, targetPosition, juice != null ? juice.mergePullDuration : gameConfig.mergeSlideDuration);
 
+            // The target can be killed while the merge animates; cancel instead of upgrading a destroyed troop.
+            if (!IsMergeable(target))
+            {
+                CancelMerge(source, sourceColumn, sourceRow);
+                yield break;
+            }
+
             float flashDuration = juice != null ? juice.mergeFlashDuration : gameConfig.mergeFlashDuration;
             source.PlayMergeFlash(flashDuration);
             target.PlayMergeFlash(flashDuration);
             yield return WaitRealtime(flashDuration * 0.5f);
+
+            if (!IsMergeable(target))
+            {
+                CancelMerge(source, sourceColumn, sourceRow);
+                yield break;
+            }
 
             if (source != null)
             {
@@ -230,6 +247,51 @@ namespace MergeAndMarch.Gameplay
             waveManager?.RegisterMerge();
             yield return AnimateMergePop(target, juice);
             ApplyMergeHeal(target);
+
+            draggedTroop = null;
+            isResolving = false;
+            RestoreTime();
+        }
+
+        /// <summary>
+        /// Stops any drag or merge in progress and clears its state. Called when a run starts so a
+        /// merge interrupted by the previous run can never leave merging locked.
+        /// </summary>
+        public void ResetState()
+        {
+            StopAllCoroutines();
+            ClearAllHighlights();
+            if (draggedTroop != null)
+            {
+                draggedTroop.SetDragging(false);
+            }
+
+            draggedTroop = null;
+            isResolving = false;
+            JuiceFx.Instance?.SetSlowMo(false);
+            RestoreTime();
+        }
+
+        private static bool IsMergeable(Troop troop)
+        {
+            return troop != null && troop.IsAlive;
+        }
+
+        /// <summary>Puts the dragged troop back on the grid after a merge whose target died.</summary>
+        private void CancelMerge(Troop source, int column, int row)
+        {
+            if (IsMergeable(source))
+            {
+                bool hasSlot = column >= 0 && row >= 0 && battleGrid.GetTroopAt(column, row) == null;
+                if (hasSlot || battleGrid.TryGetNearestSlot(source.transform.position, out column, out row) && battleGrid.GetTroopAt(column, row) == null)
+                {
+                    battleGrid.RegisterTroop(source, column, row, moveToSlot: true);
+                }
+                else
+                {
+                    Destroy(source.gameObject);
+                }
+            }
 
             draggedTroop = null;
             isResolving = false;

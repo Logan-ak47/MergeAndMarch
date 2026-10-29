@@ -50,6 +50,13 @@ namespace MergeAndMarch.Data
         public Sprite fxGlow;
         public Sprite fxShadow;
         public Sprite fxCoin;
+        public Sprite fxSlash;
+        [Tooltip("Coloured arrow, pointing right; not tinted.")]
+        public Sprite fxArrow;
+        public Sprite fxVignette;
+
+        [Header("UI icons")]
+        public Sprite iconHourglass;
 
         /// <summary>Returns the face sprite for a state; enemies fall back to the closest state they have.</summary>
         public Sprite GetFace(BeanFace face, bool enemy)

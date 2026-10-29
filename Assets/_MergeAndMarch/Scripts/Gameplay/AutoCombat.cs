@@ -10,7 +10,6 @@ namespace MergeAndMarch.Gameplay
         private static Sprite runtimeSquareSprite;
         private const float MageBandHalfHeight = 0.85f;
         private const float MageWaveDuration = 0.3f;
-        private const float HealerPulseDuration = 0.4f;
 
         private readonly List<Troop> troopBuffer = new();
         private readonly Dictionary<Troop, float> attackCooldowns = new();
@@ -151,6 +150,7 @@ namespace MergeAndMarch.Gameplay
             if (troop.Data.troopType == TroopType.Knight)
             {
                 target.PlayImpactFeedback();
+                JuiceFx.Instance?.KnightSlash(target.transform.position, troop.transform.position, troop.Data.troopColor);
             }
 
             target.ApplyDamage(damage, troop);
@@ -166,7 +166,7 @@ namespace MergeAndMarch.Gameplay
 
             healer.PlayAttackFeedback(healTarget.transform.position);
             healTarget.HealFlat(GetHealerPowerFor(healer));
-            StartCoroutine(PlayHealerPulseRoutine(healTarget.transform.position));
+            JuiceFx.Instance?.HealRing(healer.transform.position, healTarget.transform.position);
             return true;
         }
 
@@ -187,6 +187,12 @@ namespace MergeAndMarch.Gameplay
                 }
 
                 float verticalDistance = troop.transform.position.y - enemy.transform.position.y;
+                if (troop.Data.troopType == TroopType.Archer
+                    && enemy.transform.position.y - troop.transform.position.y > gameConfig.archerRange)
+                {
+                    continue;
+                }
+
                 int columnOffset = 0;
                 if (troop.Data.troopType == TroopType.Knight)
                 {
@@ -202,7 +208,11 @@ namespace MergeAndMarch.Gameplay
                         continue;
                     }
 
-                    if (verticalDistance < -0.05f || verticalDistance > gameConfig.knightMeleeReach)
+                    // Enemies stand above the Knight, so measure enemy minus troop (the old sign skipped
+                    // every enemy in front of it). Reach always covers the body-contact stop distance.
+                    float distanceAhead = enemy.transform.position.y - troop.transform.position.y;
+                    float reach = Mathf.Max(gameConfig.knightMeleeReach, enemy.GetContactDistance(troop) + 0.15f);
+                    if (distanceAhead < -0.05f || distanceAhead > reach)
                     {
                         continue;
                     }
@@ -269,13 +279,18 @@ namespace MergeAndMarch.Gameplay
 
         private IEnumerator PlayMageWaveRoutine(Troop troop, float targetY, float damage)
         {
+            JuiceFx fx = JuiceFx.Instance;
+            JuiceConfig juice = fx != null ? fx.Config : null;
+            float waveDuration = juice != null ? juice.mageWaveDuration : MageWaveDuration;
             GameObject wave = new("MageWave");
             float waveWidth = GetCameraWorldWidth();
-            float waveHeight = Mathf.Max(0.18f, gameConfig != null ? gameConfig.cellSize * 0.2f : 0.2f);
+            float waveHeight = juice != null
+                ? juice.mageWaveHeight
+                : Mathf.Max(0.18f, gameConfig != null ? gameConfig.cellSize * 0.2f : 0.2f);
             Color waveColor = troop != null && troop.Data != null
                 ? troop.Data.troopColor
                 : new Color(0.7333f, 0.4196f, 1f, 1f);
-            waveColor.a = 0.9f;
+            waveColor.a = juice != null ? 0.6f : 0.9f;
 
             wave.transform.position = new Vector3(GetCameraCenterX(troop), targetY, 0f);
             wave.transform.localScale = new Vector3(0.25f, waveHeight, 1f);
@@ -286,13 +301,25 @@ namespace MergeAndMarch.Gameplay
             renderer.sortingLayerName = "Effects";
             renderer.sortingOrder = 6;
 
+            // White core band so the wave reads as energy, not a coloured bar (Mage's identity moment).
+            SpriteRenderer core = CreateEffectSprite(wave.transform, "Core", GetRuntimeSquareSprite(), new Color(1f, 1f, 1f, 0.9f), 7);
+            core.transform.localScale = new Vector3(1f, 0.28f, 1f);
+            if (fx != null && fx.Art != null)
+            {
+                for (int i = 0; i < 6; i++)
+                {
+                    Vector3 sparkPosition = new(wave.transform.position.x + Random.Range(-waveWidth * 0.45f, waveWidth * 0.45f), targetY + Random.Range(-waveHeight * 0.3f, waveHeight * 0.3f), 0f);
+                    fx.Spawn(fx.Art.fxSparkle, sparkPosition, Color.white, 0.22f, 0.05f, waveDuration, 0f, default, 0f, Random.Range(-360f, 360f), false, "Effects", 8, 0.4f);
+                }
+            }
+
             bool didApplyDamage = false;
             float elapsed = 0f;
 
-            while (elapsed < MageWaveDuration)
+            while (elapsed < waveDuration)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / MageWaveDuration);
+                float t = Mathf.Clamp01(elapsed / waveDuration);
                 float widthT = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 0.35f));
                 float currentWidth = Mathf.Lerp(0.25f, waveWidth, widthT);
                 float currentHeight = Mathf.Lerp(waveHeight * 0.8f, waveHeight * 1.2f, t);
@@ -301,6 +328,7 @@ namespace MergeAndMarch.Gameplay
                 Color color = waveColor;
                 color.a = Mathf.Lerp(waveColor.a, 0f, t);
                 renderer.color = color;
+                core.color = new Color(1f, 1f, 1f, Mathf.Lerp(0.9f, 0f, t));
 
                 if (!didApplyDamage && t >= 0.2f)
                 {
@@ -326,18 +354,35 @@ namespace MergeAndMarch.Gameplay
                 yield break;
             }
 
+            JuiceFx fx = JuiceFx.Instance;
+            JuiceConfig juice = fx != null ? fx.Config : null;
+            Sprite arrowSprite = fx != null && fx.Art != null ? fx.Art.fxArrow : null;
+            Color troopColor = troop.Data != null ? troop.Data.troopColor : new Color(0.266f, 1f, 0.533f, 1f);
+
             GameObject projectile = new("ArcherProjectile");
             projectile.transform.position = troop.transform.position;
-            projectile.transform.localScale = Vector3.one * 0.15f;
 
             SpriteRenderer renderer = projectile.AddComponent<SpriteRenderer>();
-            renderer.sprite = GetRuntimeSquareSprite();
-            renderer.color = troop.Data != null ? troop.Data.troopColor : new Color(0.266f, 1f, 0.533f, 1f);
             renderer.sortingLayerName = "Effects";
             renderer.sortingOrder = 5;
+            if (arrowSprite != null)
+            {
+                // Bean arrow sprite (art bible Section 2: type-coloured projectile with a white core).
+                renderer.sprite = arrowSprite;
+                renderer.color = Color.white;
+                float arrowScale = juice.arrowSize / Mathf.Max(0.0001f, arrowSprite.bounds.size.x);
+                projectile.transform.localScale = Vector3.one * arrowScale;
+            }
+            else
+            {
+                renderer.sprite = GetRuntimeSquareSprite();
+                renderer.color = troopColor;
+                projectile.transform.localScale = Vector3.one * 0.15f;
+            }
 
             Vector3 start = projectile.transform.position;
-            float duration = 0.18f;
+            fx?.MuzzlePop(start, troopColor);
+            float duration = juice != null ? juice.arrowFlightDuration : 0.18f;
             float elapsed = 0f;
 
             while (elapsed < duration)
@@ -345,7 +390,15 @@ namespace MergeAndMarch.Gameplay
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / duration);
                 Vector3 targetPosition = target != null ? target.transform.position : start;
+                Vector3 previous = projectile.transform.position;
                 projectile.transform.position = Vector3.Lerp(start, targetPosition, t);
+                Vector3 travel = targetPosition - start;
+                if (travel.sqrMagnitude > 0.0001f)
+                {
+                    projectile.transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(travel.y, travel.x) * Mathf.Rad2Deg);
+                }
+
+                fx?.ProjectileTrail(previous, troopColor);
                 yield return null;
             }
 
@@ -455,35 +508,6 @@ namespace MergeAndMarch.Gameplay
 
                 enemy.ApplyDamage(damage, source);
             }
-        }
-
-        private IEnumerator PlayHealerPulseRoutine(Vector3 targetPosition)
-        {
-            GameObject plusRoot = new("HealerPulse");
-            plusRoot.transform.position = targetPosition;
-            plusRoot.transform.localScale = Vector3.one * 0.45f;
-
-            SpriteRenderer vertical = CreateEffectSprite(plusRoot.transform, "Vertical", GetRuntimeSquareSprite(), new Color(0.55f, 1f, 0.62f, 0.95f), 6);
-            vertical.transform.localScale = new Vector3(0.14f, 0.5f, 1f);
-
-            SpriteRenderer horizontal = CreateEffectSprite(plusRoot.transform, "Horizontal", GetRuntimeSquareSprite(), new Color(0.55f, 1f, 0.62f, 0.95f), 6);
-            horizontal.transform.localScale = new Vector3(0.5f, 0.14f, 1f);
-
-            float elapsed = 0f;
-            while (elapsed < HealerPulseDuration)
-            {
-                elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / HealerPulseDuration);
-                plusRoot.transform.position = targetPosition + (Vector3.up * Mathf.Lerp(0f, 0.18f, t));
-                plusRoot.transform.localScale = Vector3.one * Mathf.Lerp(0.45f, 0.8f, t);
-
-                float alpha = Mathf.Lerp(0.95f, 0f, t);
-                vertical.color = new Color(0.55f, 1f, 0.62f, alpha);
-                horizontal.color = new Color(0.55f, 1f, 0.62f, alpha);
-                yield return null;
-            }
-
-            Destroy(plusRoot);
         }
 
         private SpriteRenderer CreateEffectSprite(Transform parent, string name, Sprite sprite, Color color, int sortingOrder)

@@ -20,6 +20,7 @@ namespace MergeAndMarch.Gameplay
         private const float TierTwoGlowPadding = 0.035f;
         private const float TierThreeGlowPadding = 0.045f;
         private const float MergeHighlightPadding = 0.08f;
+        private const int HighlightSortingOrder = 15;
 
         [SerializeField] private SpriteRenderer spriteRenderer;
         [SerializeField] private BoxCollider2D boxCollider;
@@ -41,6 +42,9 @@ namespace MergeAndMarch.Gameplay
         public bool IsInteractable => IsAlive && !hasExplodedThisWave;
         public bool IsSingleUse => Data != null && Data.troopType == TroopType.Bomber;
         public bool HasExplodedThisWave => hasExplodedThisWave;
+
+        /// <summary>Half the body height in world units, including tier scale; used for contact distances.</summary>
+        public float VisualHalfHeight => baseSpriteSize.y * 0.5f * Mathf.Abs(transform.lossyScale.y);
 
         /// <summary>The layered bean renderer, or null when the troop uses its legacy sprites.</summary>
         public BeanVisual Bean => bean;
@@ -275,6 +279,7 @@ namespace MergeAndMarch.Gameplay
 
             spriteRenderer.sprite = null;
             spriteRenderer.enabled = false;
+            PlaceHpBarAboveBean();
             if (tierGlowRenderer != null)
             {
                 tierGlowRenderer.enabled = false;
@@ -286,6 +291,20 @@ namespace MergeAndMarch.Gameplay
             }
 
             return true;
+        }
+
+        /// <summary>Moves the HP bar above the bean's hat; the prefab position was set for the old sprites.</summary>
+        private void PlaceHpBarAboveBean()
+        {
+            if (hpBarRoot == null)
+            {
+                ResolveReadabilityReferences();
+            }
+
+            if (hpBarRoot != null && hpBarRoot.transform is RectTransform barRect)
+            {
+                barRect.anchoredPosition = new Vector2(0f, bean.TopLocalY + 0.06f);
+            }
         }
 
         private static BeanPropAction GetPropAction(TroopType troopType)
@@ -317,6 +336,14 @@ namespace MergeAndMarch.Gameplay
             if (bean != null)
             {
                 bean.SetHighlighted(on);
+
+                // Lift valid merge partners above the slow-mo dim so they stay bright (art bible Section 2).
+                if (!isDragging && spriteRenderer != null)
+                {
+                    spriteRenderer.sortingOrder = on ? HighlightSortingOrder : defaultSortingOrder;
+                    UpdateReadabilitySorting();
+                }
+
                 return;
             }
 
@@ -333,9 +360,12 @@ namespace MergeAndMarch.Gameplay
         public void SetDimmed(bool on)
         {
             isDimmed = on;
+
+            // A spent Bomber stays faded; un-dimming after a drag must not make it look ready again.
+            float restingAlpha = hasExplodedThisWave ? 0.08f : 1f;
             if (bean != null)
             {
-                bean.SetAlpha(on ? 0.45f : 1f);
+                bean.SetAlpha(on ? Mathf.Min(0.45f, restingAlpha) : restingAlpha);
                 return;
             }
 
@@ -345,28 +375,20 @@ namespace MergeAndMarch.Gameplay
             }
 
             Color c = spriteRenderer.color;
-            c.a = on ? 0.45f : 1f;
+            c.a = on ? Mathf.Min(0.45f, restingAlpha) : restingAlpha;
             spriteRenderer.color = c;
         }
 
         public float GetTierStatMultiplier()
         {
-            return Tier switch
-            {
-                2 => 3f,
-                3 => 9f,
-                _ => 1f
-            };
+            float fallback = Tier switch { 2 => 2.5f, 3 => 6f, _ => 1f };
+            return currentConfig != null ? GameConfig.TierValue(currentConfig.tierStatMultipliers, Tier, fallback) : fallback;
         }
 
         public float GetAttackIntervalMultiplier()
         {
-            return Tier switch
-            {
-                2 => 0.9f,
-                3 => 0.8f,
-                _ => 1f
-            };
+            float fallback = Tier switch { 2 => 0.9f, 3 => 0.85f, _ => 1f };
+            return currentConfig != null ? GameConfig.TierValue(currentConfig.tierAttackIntervalMultipliers, Tier, fallback) : fallback;
         }
 
         public float GetAttackDamage()
@@ -416,7 +438,8 @@ namespace MergeAndMarch.Gameplay
             currentHP = Mathf.Clamp(currentHP + Mathf.Max(0f, amount), 0f, MaxHP);
             if (bean != null)
             {
-                bean.Flash(bean.Config.healMint, bean.Config.healFlashDuration, 0.6f);
+                // A tint, not a silhouette overlay: frequent heals must not wash the troop out.
+                bean.Tint(bean.Config.healTint, bean.Config.healFlashDuration * 2f);
                 bean.ShowFace(BeanFace.Happy, bean.Config.healFlashDuration * 2.5f);
             }
             else
@@ -563,22 +586,27 @@ namespace MergeAndMarch.Gameplay
                 if (Vector2.Distance(transform.position, enemy.transform.position) <= radius)
                 {
                     enemy.ApplyDamage(damage, this);
+                    enemy.Knockback(enemy.transform.position - transform.position);
                 }
             }
 
-            StartCoroutine(PlayBomberExplosionRoutine(radius));
+            JuiceFx fx = JuiceFx.Instance;
+            if (bean != null && fx != null)
+            {
+                fx.BomberBlast(transform.position, radius);
+            }
+            else
+            {
+                StartCoroutine(PlayBomberExplosionRoutine(radius));
+            }
             ConsumeBomber();
             return true;
         }
 
         public float GetBomberExplosionRadius()
         {
-            float radius = Tier switch
-            {
-                2 => 2.5f,
-                3 => 3f,
-                _ => 2f
-            };
+            float fallbackRadius = Tier switch { 2 => 2.5f, 3 => 3f, _ => 2f };
+            float radius = currentConfig != null ? GameConfig.TierValue(currentConfig.bomberTierRadius, Tier, fallbackRadius) : fallbackRadius;
 
             RunBuffs buffs = CardSystem.Instance != null ? CardSystem.Instance.runBuffs : null;
             if (buffs != null)

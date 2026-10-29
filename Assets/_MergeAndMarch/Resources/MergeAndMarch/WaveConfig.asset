@@ -1,0 +1,91 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7fb49bbeedcf13245a148c29177d96e5, type: 3}
+  m_Name: WaveConfig
+  m_EditorClassIdentifier: Assembly-CSharp::MergeAndMarch.Data.WaveConfig
+  waves:
+  - grunts: 4
+    rushers: 0
+    tanks: 0
+    flyers: 0
+  - grunts: 4
+    rushers: 1
+    tanks: 0
+    flyers: 0
+  - grunts: 4
+    rushers: 0
+    tanks: 1
+    flyers: 0
+  - grunts: 4
+    rushers: 2
+    tanks: 0
+    flyers: 0
+  - grunts: 4
+    rushers: 0
+    tanks: 1
+    flyers: 1
+  - grunts: 4
+    rushers: 2
+    tanks: 1
+    flyers: 0
+  - grunts: 4
+    rushers: 2
+    tanks: 1
+    flyers: 1
+  - grunts: 3
+    rushers: 2
+    tanks: 1
+    flyers: 2
+  - grunts: 4
+    rushers: 2
+    tanks: 2
+    flyers: 1
+  - grunts: 3
+    rushers: 2
+    tanks: 2
+    flyers: 2
+  - grunts: 4
+    rushers: 3
+    tanks: 2
+    flyers: 1
+  - grunts: 3
+    rushers: 3
+    tanks: 2
+    flyers: 3
+  - grunts: 3
+    rushers: 3
+    tanks: 3
+    flyers: 2
+  - grunts: 3
+    rushers: 3
+    tanks: 3
+    flyers: 3
+  - grunts: 3
+    rushers: 3
+    tanks: 3
+    flyers: 3
+  bossWave: 16
+  hpBase: 1.4
+  hpGrowth: 1.12
+  attackGrowthPerWave: 0.06
+  spawnIntervalStart: 0.9
+  spawnIntervalStep: 0.03
+  spawnIntervalMin: 0.45
+  earlyVariantWaves: 5
+  earlyVariantHpMultiplier: 0.75
+  rusherSlowWaves: 3
+  rusherEarlySpeed: 0.8
+  flyerSlowWaves: 5
+  flyerEarlySpeed: 0.7
+  bossHpMultiplier: 5
+  bossAttackMultiplier: 2
+  bossScaleMultiplier: 1.45

@@ -37,3 +37,7 @@ MonoBehaviour:
   fxGlow: {fileID: 21300000, guid: 1c032c2b1cbcfe442a73f3df2267ed80, type: 3}
   fxShadow: {fileID: 21300000, guid: 701bb730aac0cac449ee6559b97d1a08, type: 3}
   fxCoin: {fileID: 21300000, guid: abb15c631cea1e840a1bc998fa7684f9, type: 3}
+  fxSlash: {fileID: 21300000, guid: 812be52799131734f96e8c8e5cca8228, type: 3}
+  fxArrow: {fileID: 21300000, guid: 43b37f8a11206b541a7846c06e8d02a7, type: 3}
+  fxVignette: {fileID: 21300000, guid: be64ab2f0602b0c41b403acf68391016, type: 3}
+  iconHourglass: {fileID: 21300000, guid: a25748ef522a08041ab250e580e0c6aa, type: 3}

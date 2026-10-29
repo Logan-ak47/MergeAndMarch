@@ -52,9 +52,7 @@ namespace MergeAndMarch.Gameplay
 
             string value = FormatDamage(amount);
             float sizePx = juice.damageNumberFontSize * (emphasised ? juice.damageNumberTierThreeScale : 1f);
-            DamageNumber number = Create($"Damage_{value}", worldPosition, value, color, sizePx, juice);
-            number.lifetime = juice.damageNumberLifetime;
-            number.countsTowardCap = true;
+            DamageNumber number = Create($"Damage_{value}", worldPosition, value, color, sizePx, juice, juice.damageNumberLifetime, false, true);
             liveNumbers.Add(number);
         }
 
@@ -62,9 +60,7 @@ namespace MergeAndMarch.Gameplay
         public static void SpawnLabel(Vector3 worldPosition, string text, Color color, float sizeMultiplier = 1f)
         {
             JuiceConfig juice = ResolveConfig();
-            DamageNumber label = Create($"Label_{text}", worldPosition, text, color, juice.damageNumberFontSize * sizeMultiplier, juice);
-            label.lifetime = juice.damageNumberLifetime * 1.8f;
-            label.unscaled = true;
+            Create($"Label_{text}", worldPosition, text, color, juice.damageNumberFontSize * sizeMultiplier, juice, juice.damageNumberLifetime * 1.8f, true, false);
         }
 
         private static JuiceConfig ResolveConfig()
@@ -89,10 +85,15 @@ namespace MergeAndMarch.Gameplay
             return Mathf.RoundToInt(damage).ToString();
         }
 
-        private static DamageNumber Create(string objectName, Vector3 worldPosition, string text, Color color, float sizePx, JuiceConfig juice)
+        private static DamageNumber Create(string objectName, Vector3 worldPosition, string text, Color color, float sizePx, JuiceConfig juice, float lifetime, bool unscaled, bool countsTowardCap)
         {
             GameObject root = new(objectName);
             DamageNumber number = root.AddComponent<DamageNumber>();
+
+            // Set before Initialize starts the float coroutine, which reads them on its first step.
+            number.lifetime = lifetime;
+            number.unscaled = unscaled;
+            number.countsTowardCap = countsTowardCap;
             number.Initialize(worldPosition, text, color, sizePx, juice);
             return number;
         }

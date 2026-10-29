@@ -60,6 +60,7 @@ namespace MergeAndMarch.Gameplay
         private Vector3 restPosition;
         private float bodyHeight = 1f;
         private float bodyCenterY;
+        private float bodyTopY = 1f;
         private float shadowBaseScale = 1f;
 
         private Vector2 squash = Vector2.one;
@@ -99,6 +100,9 @@ namespace MergeAndMarch.Gameplay
 
         /// <summary>Body height in the unit's local space (before tier scale).</summary>
         public float BodyHeight => bodyHeight;
+
+        /// <summary>Top of the body sprite (hat included) in the unit root's local space.</summary>
+        public float TopLocalY => restPosition.y + bodyTopY;
 
         /// <summary>World position of the feet (the shadow's ground point).</summary>
         public Vector3 FeetPosition => unitRoot != null ? unitRoot.TransformPoint(restPosition) : transform.position;
@@ -149,6 +153,7 @@ namespace MergeAndMarch.Gameplay
 
             bodyHeight = body != null ? body.bounds.size.y : 1f;
             bodyCenterY = body != null ? body.bounds.center.y : 0.5f;
+            bodyTopY = body != null ? body.bounds.max.y : 1f;
             restPosition = new Vector3(0f, -bodyCenterY, 0f);
             transform.localPosition = restPosition;
 

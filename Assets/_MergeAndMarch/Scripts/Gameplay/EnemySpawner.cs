@@ -11,9 +11,11 @@ namespace MergeAndMarch.Gameplay
 {
     public class EnemySpawner : MonoBehaviour
     {
-        private static readonly int[] RegularWaveCounts = { 3, 3, 4, 5, 6, 6, 7, 8, 8, 9, 10, 10, 11, 12, 12 };
+        private const string WaveConfigResourcePath = "MergeAndMarch/WaveConfig";
 
         [SerializeField] private GameConfig gameConfig;
+        [Tooltip("Wave composition and threat curves; loaded from Resources/MergeAndMarch/WaveConfig when empty.")]
+        [SerializeField] private WaveConfig waveConfig;
         [SerializeField] private BattleGrid battleGrid;
         [SerializeField] private Enemy enemyPrefab;
         [SerializeField] private EnemyData gruntData;
@@ -33,9 +35,32 @@ namespace MergeAndMarch.Gameplay
         private readonly List<int> waveSpawnColumns = new();
 
         public event Action<int> WaveClearedEvent;
-        public event Action EnemyEscapedEvent;
+        /// <summary>Raised when an enemy walks past the troops into the base.</summary>
+        public event Action<Enemy> EnemyEscapedEvent;
 
         public int CurrentWave => currentWave;
+
+        /// <summary>Wave balance data (never null; falls back to defaults).</summary>
+        public WaveConfig Waves
+        {
+            get
+            {
+                if (waveConfig == null)
+                {
+                    waveConfig = Resources.Load<WaveConfig>(WaveConfigResourcePath);
+                }
+
+                if (waveConfig == null)
+                {
+                    waveConfig = ScriptableObject.CreateInstance<WaveConfig>();
+                }
+
+                return waveConfig;
+            }
+        }
+
+        /// <summary>The boss wave, which is also the last wave of a run.</summary>
+        public int BossWave => Waves.bossWave;
         public int ActiveEnemyCount => activeEnemyCount;
         public int SpawnedThisWave => spawnedThisWave;
         public int DefeatedThisWave => defeatedThisWave;
@@ -110,7 +135,10 @@ namespace MergeAndMarch.Gameplay
         public void NotifyEnemyEscaped(Enemy enemy)
         {
             activeEnemyCount = Mathf.Max(0, activeEnemyCount - 1);
-            EnemyEscapedEvent?.Invoke();
+            EnemyEscapedEvent?.Invoke(enemy);
+
+            // An escaped enemy can be the last of the wave; without this the wave never clears.
+            EvaluateWaveCleared();
         }
 
         private IEnumerator SpawnWaveRoutine(int waveNumber)
@@ -122,7 +150,7 @@ namespace MergeAndMarch.Gameplay
             float failY = gridBounds.min.y - gameConfig.enemyFailOffset;
             Transform parent = enemyRoot != null ? enemyRoot : transform;
 
-            if (waveNumber == 16)
+            if (waveNumber >= BossWave)
             {
                 SpawnEnemy(bossData != null ? bossData : gruntData, waveNumber, spawnY, failY, parent);
             }
@@ -135,8 +163,9 @@ namespace MergeAndMarch.Gameplay
                     SpawnEnemyAtColumn(waveEnemies[i], waveNumber, spawnY, failY, parent, waveSpawnColumns[i], i);
                     if (i < waveEnemies.Count - 1)
                     {
-                        float delay = UnityEngine.Random.Range(gameConfig.enemySpawnIntervalMin, gameConfig.enemySpawnIntervalMax);
-                        yield return new WaitForSecondsRealtime(delay);
+                        // Scaled time, so spawn pacing follows slow-mo and the balance harness's time scale.
+                        float delay = Waves.SpawnInterval(waveNumber) * UnityEngine.Random.Range(0.9f, 1.1f);
+                        yield return new WaitForSeconds(delay);
                     }
                 }
             }
@@ -148,7 +177,9 @@ namespace MergeAndMarch.Gameplay
 
         private void SpawnEnemy(EnemyData data, int waveNumber, float spawnY, float failY, Transform parent)
         {
-            int column = UnityEngine.Random.Range(0, Mathf.Max(1, gameConfig.columns));
+            // The boss always comes down a lane that holds a troop, so the finale is a fight rather
+            // than a coin flip on whether its random lane is empty.
+            int column = waveNumber >= BossWave ? PickOccupiedColumn() : UnityEngine.Random.Range(0, Mathf.Max(1, gameConfig.columns));
             SpawnEnemyAtColumn(data, waveNumber, spawnY, failY, parent, column, spawnedThisWave);
         }
 
@@ -164,18 +195,20 @@ namespace MergeAndMarch.Gameplay
             float xOffset = GetSpawnXOffset(spawnIndex);
             Vector3 spawnPosition = new(lanePos.x + xOffset, spawnY, 0f);
 
-            float healthMultiplier = waveNumber == 16 ? 5f : 1f + ((waveNumber - 1) * 0.12f);
-            float attackMultiplier = waveNumber == 16 ? 2f : 1f;
-            float scaleMultiplier = waveNumber == 16 ? data.sizeScale * 1.45f : data.sizeScale;
-            float variantDampener = waveNumber <= 5 && data.enemyType != EnemyType.Grunt ? 0.75f : 1f;
+            WaveConfig waves = Waves;
+            bool isBoss = waveNumber >= waves.bossWave;
+            float healthMultiplier = isBoss ? waves.bossHpMultiplier : waves.HpMultiplier(waveNumber);
+            float attackMultiplier = isBoss ? waves.bossAttackMultiplier : waves.AttackMultiplier(waveNumber);
+            float scaleMultiplier = isBoss ? data.sizeScale * waves.bossScaleMultiplier : data.sizeScale;
+            float variantDampener = waveNumber <= waves.earlyVariantWaves && data.enemyType != EnemyType.Grunt ? waves.earlyVariantHpMultiplier : 1f;
             float speedMultiplier = 1f;
-            if (data.enemyType == EnemyType.Rusher && waveNumber <= 3)
+            if (data.enemyType == EnemyType.Rusher && waveNumber <= waves.rusherSlowWaves)
             {
-                speedMultiplier = 0.8f;
+                speedMultiplier = waves.rusherEarlySpeed;
             }
-            else if (data.enemyType == EnemyType.Flyer && waveNumber <= 5)
+            else if (data.enemyType == EnemyType.Flyer && waveNumber <= waves.flyerSlowWaves)
             {
-                speedMultiplier = 0.7f;
+                speedMultiplier = waves.flyerEarlySpeed;
             }
 
             Enemy enemy = Instantiate(enemyPrefab, parent);
@@ -195,6 +228,38 @@ namespace MergeAndMarch.Gameplay
             activeEnemyCount++;
         }
 
+        /// <summary>A random lane containing a troop, preferring lanes with a front-row troop.</summary>
+        private int PickOccupiedColumn()
+        {
+            int columns = Mathf.Max(1, gameConfig.columns);
+            List<int> front = new();
+            List<int> any = new();
+            for (int column = 0; column < columns; column++)
+            {
+                for (int row = 0; row < gameConfig.rows; row++)
+                {
+                    Troop troop = battleGrid.GetTroopAt(column, row);
+                    if (troop == null || !troop.IsAlive)
+                    {
+                        continue;
+                    }
+
+                    if (!any.Contains(column))
+                    {
+                        any.Add(column);
+                    }
+
+                    if (row == 0 && !front.Contains(column))
+                    {
+                        front.Add(column);
+                    }
+                }
+            }
+
+            List<int> pool = front.Count > 0 ? front : any;
+            return pool.Count > 0 ? pool[UnityEngine.Random.Range(0, pool.Count)] : UnityEngine.Random.Range(0, columns);
+        }
+
         private float GetSpawnXOffset(int spawnIndex)
         {
             float randomOffset = UnityEngine.Random.Range(-gameConfig.cellSize * 0.12f, gameConfig.cellSize * 0.12f);
@@ -207,79 +272,12 @@ namespace MergeAndMarch.Gameplay
             EnemyData r = rusherData != null ? rusherData : gruntData;
             EnemyData t = tankData != null ? tankData : gruntData;
             EnemyData f = flyerData != null ? flyerData : gruntData;
-            List<EnemyData> enemies = new(RegularWaveCounts[Mathf.Clamp(wave - 1, 0, RegularWaveCounts.Length - 1)]);
-
-            if (wave == 1)
-            {
-                AddEnemies(enemies, gruntData, 3);
-            }
-            else if (wave == 2)
-            {
-                AddEnemies(enemies, gruntData, 3);
-                AddEnemies(enemies, r, 1);
-            }
-            else if (wave == 3)
-            {
-                AddEnemies(enemies, gruntData, 4);
-                AddEnemies(enemies, t, 1);
-            }
-            else if (wave == 4)
-            {
-                AddEnemies(enemies, gruntData, 4);
-                AddEnemies(enemies, r, 2);
-            }
-            else if (wave == 5)
-            {
-                AddEnemies(enemies, gruntData, 4);
-                AddEnemies(enemies, t, 1);
-                AddEnemies(enemies, f, 1);
-            }
-            else if (wave == 6)
-            {
-                AddEnemies(enemies, gruntData, 3);
-                AddEnemies(enemies, r, 2);
-                AddEnemies(enemies, t, 1);
-            }
-            else if (wave == 7)
-            {
-                AddEnemies(enemies, gruntData, 3);
-                AddEnemies(enemies, r, 1);
-                AddEnemies(enemies, t, 2);
-                AddEnemies(enemies, f, 1);
-            }
-            else if (wave == 8)
-            {
-                AddEnemies(enemies, gruntData, 2);
-                AddEnemies(enemies, r, 2);
-                AddEnemies(enemies, t, 1);
-                AddEnemies(enemies, f, 2);
-            }
-            else if (wave <= 10)
-            {
-                AddEnemies(enemies, gruntData, 3);
-                AddEnemies(enemies, r, 2);
-                AddEnemies(enemies, t, 2);
-                AddEnemies(enemies, f, 2);
-            }
-            else if (wave <= 12)
-            {
-                AddEnemies(enemies, gruntData, 2);
-                AddEnemies(enemies, r, 3);
-                AddEnemies(enemies, t, 2);
-                AddEnemies(enemies, f, 3);
-            }
-            else if (wave <= 15)
-            {
-                AddEnemies(enemies, gruntData, 2);
-                AddEnemies(enemies, r, 3);
-                AddEnemies(enemies, t, 3);
-                AddEnemies(enemies, f, 4);
-            }
-            else
-            {
-                AddEnemies(enemies, gruntData, RegularWaveCounts[Mathf.Clamp(wave - 1, 0, RegularWaveCounts.Length - 1)]);
-            }
-
+            WaveConfig.WaveDefinition definition = Waves.GetWave(wave);
+            List<EnemyData> enemies = new(definition.Total);
+            AddEnemies(enemies, gruntData, definition.grunts);
+            AddEnemies(enemies, r, definition.rushers);
+            AddEnemies(enemies, t, definition.tanks);
+            AddEnemies(enemies, f, definition.flyers);
             return enemies;
         }
 

@@ -113,3 +113,31 @@ MonoBehaviour:
   deployLandSquash: {x: 1.15, y: 0.85}
   deployLandDuration: 0.1
   healFlashDuration: 0.12
+  healRingSize: 1.5
+  healRingDuration: 0.3
+  slowMoDimAlpha: 0.55
+  slowMoVignetteAlpha: 0.5
+  slowMoFadeIn: 0.1
+  slowMoFadeOut: 0.15
+  slowMoIconPx: 72
+  slowMoIconTopPx: 300
+  knightSlashStartSize: 0.45
+  knightSlashEndSize: 1.05
+  knightSlashDuration: 0.2
+  arrowSize: 0.42
+  arrowFlightDuration: 0.18
+  muzzlePopSize: 0.38
+  mageWaveHeight: 0.9
+  mageWaveDuration: 0.4
+  bomberBlastColor: {r: 1, g: 0.478, b: 0, a: 1}
+  bomberBlastCore: {r: 1, g: 0.882, b: 0.302, a: 1}
+  bomberShakePx: 5
+  bomberShakeDuration: 0.25
+  bomberKnockback: 0.3
+  bomberKnockbackDuration: 0.2
+  bossEntranceShakePx: 8
+  bossEntranceShakeDuration: 0.3
+  bossLandSquash: {x: 1.3, y: 0.7}
+  bossLabel: BOSS!
+  defeatShakePx: 6
+  defeatShakeDuration: 0.4

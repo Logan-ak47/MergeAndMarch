@@ -25,6 +25,19 @@ MonoBehaviour:
   tierThreeTint: {r: 1, g: 0.95, b: 0.95, a: 1}
   arenaTopColor: {r: 0.169, g: 0.549, b: 1, a: 1}
   arenaBottomColor: {r: 0.416, g: 0.239, b: 1, a: 1}
+  tierStatMultipliers:
+  - 1
+  - 2.5
+  - 6
+  tierAttackIntervalMultipliers:
+  - 1
+  - 0.9
+  - 0.85
+  bomberTierRadius:
+  - 2
+  - 2.5
+  - 3
+  startingLineup: 00000000000000000100000002000000
   targetFrameRate: 60
   laneGuideHeight: 5.8
   laneGuideWidthScale: 0.1
@@ -42,12 +55,15 @@ MonoBehaviour:
   enemySpawnYOffset: 2.2
   enemyFailOffset: 0.8
   enemyEngageDistance: 0.3
+  enemyContactOverlap: 0.8
   knightMeleeReach: 1.35
+  archerRange: 3
   mageBandHalfHeight: 0.55
   bomberTriggerReach: 0.45
   bomberExplosionRadius: 0.95
   enemySpawnIntervalMin: 0.3
   enemySpawnIntervalMax: 0.5
+  baseMaxHP: 150
   startWaveDelay: 0.6
   timeBetweenWaves: 1.5
   waveClearedBannerDuration: 1

@@ -508,6 +508,36 @@ def make_fx(out):
     coin.fill_only(Ellipse(30, 30, 12), "#ffe08a")
     coin.export(fx / "vfx_coin.png")
 
+    # Knight slash: a crescent, white so it can be tinted.
+    slash = ImageChops.subtract(Ellipse(64, 64, 58).mask(128), Ellipse(84, 52, 54).mask(128))
+    save_mask(slash, 128, fx / "vfx_slash.png")
+
+    # Archer arrow, pointing right (+x): wooden shaft, white head, green fletching.
+    arrow = Canvas(128)
+    arrow.paint(Union(Poly([(20, 52), (6, 44), (14, 64)]), Poly([(20, 76), (6, 84), (14, 64)])), TROOP_COLORS["archer"], outline=5)
+    arrow.paint(Stroke([(14, 64), (98, 64)], 9), WOOD, outline=5)
+    arrow.paint(Poly([(92, 48), (124, 64), (92, 80)]), WHITE, outline=5)
+    arrow.export(fx / "vfx_arrow.png")
+
+    # Slow-mo vignette: clear centre, opaque edges (white, tinted ink at runtime).
+    vignette = Image.new("L", (256 * SS, 256 * SS), 0)
+    vpx = vignette.load()
+    half = 128 * SS
+    for y in range(vignette.height):
+        for x in range(vignette.width):
+            dist = math.hypot((x - half) / half, (y - half) / half) / math.sqrt(2)
+            vpx[x, y] = int(min(1.0, max(0.0, (dist - 0.35) / 0.65)) ** 1.5 * 255)
+    save_mask(vignette, 256, fx / "vfx_vignette.png")
+
+    # Slow-mo hourglass icon (art bible Section 7).
+    glass = Canvas(128)
+    glass.paint(RRect(30, 14, 98, 28, 6), WOOD, outline=6)
+    glass.paint(RRect(30, 100, 98, 114, 6), WOOD, outline=6)
+    glass.paint(Union(Poly([(38, 28), (90, 28), (68, 64), (90, 100), (38, 100), (60, 64)])), WHITE, outline=6)
+    glass.fill_only(Poly([(46, 34), (82, 34), (64, 58)]), GOLD)
+    glass.fill_only(Poly([(64, 76), (84, 96), (44, 96)]), GOLD)
+    glass.export(out / "UI" / "ui_icon_hourglass.png")
+
 
 def main():
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "Assets/_MergeAndMarch/Sprites/Beans")

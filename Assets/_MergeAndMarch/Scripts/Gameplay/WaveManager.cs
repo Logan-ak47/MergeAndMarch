@@ -44,6 +44,7 @@ namespace MergeAndMarch.Gameplay
         private TextMeshProUGUI runEndText;
         private bool runActive;
         private bool runEnded;
+        private BaseHealth baseHealth;
         private bool cardPickCompleted;
         private int currentWave;
         private int totalCoins;
@@ -125,6 +126,7 @@ namespace MergeAndMarch.Gameplay
             currentWave = 0;
             totalCoins = 0;
             mergeCount = 0;
+            EnsureBaseHealth().ResetHealth();
             runActive = true;
             runEnded = false;
             State = WaveState.Idle;
@@ -153,7 +155,8 @@ namespace MergeAndMarch.Gameplay
                 yield return new WaitForSecondsRealtime(gameConfig.startWaveDelay);
             }
 
-            for (int waveNumber = 1; waveNumber <= 16; waveNumber++)
+            int bossWave = enemySpawner != null ? enemySpawner.BossWave : 16;
+            for (int waveNumber = 1; waveNumber <= bossWave; waveNumber++)
             {
                 if (waveNumber > 1)
                 {
@@ -172,7 +175,7 @@ namespace MergeAndMarch.Gameplay
                 }
 
                 currentWave = waveNumber;
-                State = waveNumber == 16 ? WaveState.BossWave : WaveState.Combat;
+                State = waveNumber == bossWave ? WaveState.BossWave : WaveState.Combat;
                 UpdateWaveCounter();
                 enemySpawner?.SpawnWave(waveNumber);
 
@@ -182,8 +185,8 @@ namespace MergeAndMarch.Gameplay
                     yield break;
                 }
 
-                AwardCoins(waveNumber == 16 ? 50 : 10);
-                if (waveNumber == 16)
+                AwardCoins(waveNumber == bossWave ? 50 : 10);
+                if (waveNumber == bossWave)
                 {
                     TriggerVictory();
                     yield break;
@@ -248,6 +251,7 @@ namespace MergeAndMarch.Gameplay
             totalCoins = Mathf.FloorToInt(totalCoins * 0.4f);
             UpdateCoinCounter();
             State = WaveState.Defeat;
+            JuiceFx.Instance?.DefeatShake();
             autoCombat?.SetCombatEnabled(false);
             ShowRunEnd("DEFEATED");
             if (AutoRestartOnRunEnd)
@@ -262,9 +266,39 @@ namespace MergeAndMarch.Gameplay
             runManager?.RestartRun();
         }
 
-        private void HandleEnemyEscaped()
+        private void HandleEnemyEscaped(Enemy enemy)
         {
-            TriggerDefeat();
+            if (runEnded)
+            {
+                return;
+            }
+
+            float damage = enemy != null && enemy.Data != null ? enemy.Data.baseDamage : 10f;
+            Vector3 hitPosition = enemy != null ? enemy.transform.position : Vector3.zero;
+            EnsureBaseHealth().TakeHit(damage, hitPosition);
+            if (baseHealth.IsDestroyed)
+            {
+                TriggerDefeat();
+            }
+        }
+
+        /// <summary>The base's health (created on first use).</summary>
+        public BaseHealth Base => EnsureBaseHealth();
+
+        private BaseHealth EnsureBaseHealth()
+        {
+            if (baseHealth == null)
+            {
+                baseHealth = GetComponent<BaseHealth>();
+                if (baseHealth == null)
+                {
+                    baseHealth = gameObject.AddComponent<BaseHealth>();
+                }
+
+                baseHealth.Initialize(gameConfig, battleGrid);
+            }
+
+            return baseHealth;
         }
 
         private void HandleCardPickCompleted()
@@ -461,7 +495,7 @@ namespace MergeAndMarch.Gameplay
                 return;
             }
 
-            bool isBoss = currentWave >= 16;
+            bool isBoss = currentWave >= (enemySpawner != null ? enemySpawner.BossWave : 16);
             waveCounterText.text = isBoss ? "BOSS" : $"Wave {currentWave} / 15";
             waveCounterText.color = isBoss ? new Color(1f, 0.78f, 0.16f, 1f) : Color.white;
             waveCounterText.fontSize = isBoss ? 48 : 42;

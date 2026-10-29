@@ -194,7 +194,7 @@ namespace MergeAndMarch.Editor
             Sprite[] sprites = new Sprite[3];
             for (int i = 0; i < sprites.Length; i++)
             {
-                sprites[i] = AssetDatabase.LoadAssetAtPath<Sprite>($"{RootPath}/Sprites/Troops/{troopName}_T{i + 1}.png");
+                sprites[i] = AssetDatabase.LoadAssetAtPath<Sprite>($"{RootPath}/Sprites/_archived/Troops/{troopName}_T{i + 1}.png");
             }
 
             return sprites;

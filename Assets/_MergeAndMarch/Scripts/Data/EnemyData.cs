@@ -14,6 +14,8 @@ namespace MergeAndMarch.Data
         [Min(0.05f)] public float attackInterval = 1.5f;
         [Min(0.1f)] public float sizeScale = 1f;
         public bool skipsFrontline;
+        [Tooltip("Damage dealt to the base when this enemy gets past the troops.")]
+        [Min(0f)] public float baseDamage = 10f;
         public float renderYOffset;
         public Sprite sprite;
 

@@ -28,7 +28,7 @@ namespace MergeAndMarch.Core
         [SerializeField] private StartingLineupPreset debugLineupPreset = StartingLineupPreset.DefaultBalanced;
 
         private WaveManager waveManager;
-        private readonly TroopType[] startingLineupComposition = new TroopType[4];
+        private TroopType[] startingLineupComposition = new TroopType[4];
 
         public GameConfig Config => gameConfig;
         public Transform TroopRoot => troopRoot != null ? troopRoot : transform;
@@ -80,6 +80,7 @@ namespace MergeAndMarch.Core
 
         public void StartRun()
         {
+            FindFirstObjectByType<MergeController>()?.ResetState();
             SetupOpeningLineup();
             TimeScaleManager.Instance?.ResetTimeScale();
             EnsureWaveManager().BeginRun();
@@ -152,6 +153,11 @@ namespace MergeAndMarch.Core
 
         private void ConfigureStartingComposition()
         {
+            if (startingLineupComposition.Length != 4)
+            {
+                startingLineupComposition = new TroopType[4];
+            }
+
             switch (debugLineupPreset)
             {
                 case StartingLineupPreset.AllKnights:
@@ -167,10 +173,15 @@ namespace MergeAndMarch.Core
                     startingLineupComposition[3] = TroopType.Bomber;
                     break;
                 default:
-                    startingLineupComposition[0] = TroopType.Knight;
-                    startingLineupComposition[1] = TroopType.Archer;
-                    startingLineupComposition[2] = TroopType.Knight;
-                    startingLineupComposition[3] = TroopType.Archer;
+                    if (gameConfig != null && gameConfig.startingLineup != null && gameConfig.startingLineup.Length > 0)
+                    {
+                        startingLineupComposition = (TroopType[])gameConfig.startingLineup.Clone();
+                    }
+                    else
+                    {
+                        startingLineupComposition = new[] { TroopType.Knight, TroopType.Knight, TroopType.Archer, TroopType.Mage };
+                    }
+
                     break;
             }
         }

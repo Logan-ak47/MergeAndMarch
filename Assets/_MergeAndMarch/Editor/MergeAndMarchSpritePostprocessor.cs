@@ -86,12 +86,13 @@ namespace MergeAndMarch.Editor
 
         private static float GetPixelsPerUnit(string path)
         {
-            if (path.StartsWith("Assets/_MergeAndMarch/Sprites/Troops/"))
+            // Legacy AI chibi sprites, archived under Sprites/_archived/ (still the fallback art).
+            if (path.Contains("/Sprites/_archived/Troops/") || path.StartsWith("Assets/_MergeAndMarch/Sprites/Troops/"))
             {
                 return 1100f;
             }
 
-            if (path.StartsWith("Assets/_MergeAndMarch/Sprites/Enemies/"))
+            if (path.Contains("/Sprites/_archived/Enemies/") || path.StartsWith("Assets/_MergeAndMarch/Sprites/Enemies/"))
             {
                 return 1200f;
             }

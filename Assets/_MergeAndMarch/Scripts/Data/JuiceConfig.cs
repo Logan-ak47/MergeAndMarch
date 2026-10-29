@@ -147,6 +147,47 @@ namespace MergeAndMarch.Data
 
         [Header("Heal")]
         [Min(0.01f)] public float healFlashDuration = 0.12f;
+        [Tooltip("Multiply tint on a healed troop; keeps the bean fully opaque.")]
+        public Color healTint = new(0.72f, 1f, 0.84f, 1f);
+        [Min(0.01f)] public float healRingSize = 1.5f;
+        [Min(0.01f)] public float healRingDuration = 0.3f;
+
+        [Header("Slow-mo overlay (art bible Sections 2 and 7)")]
+        [Range(0f, 1f)] public float slowMoDimAlpha = 0.55f;
+        [Range(0f, 1f)] public float slowMoVignetteAlpha = 0.5f;
+        [Min(0.01f)] public float slowMoFadeIn = 0.1f;
+        [Min(0.01f)] public float slowMoFadeOut = 0.15f;
+        [Min(1f)] public float slowMoIconPx = 72f;
+        [Tooltip("Distance of the hourglass below the top of the screen, in reference px (clears the HUD row).")]
+        [Min(0f)] public float slowMoIconTopPx = 300f;
+
+        [Header("Attack visuals")]
+        [Min(0.01f)] public float knightSlashStartSize = 0.45f;
+        [Min(0.01f)] public float knightSlashEndSize = 1.05f;
+        [Min(0.01f)] public float knightSlashDuration = 0.2f;
+        [Min(0.01f)] public float arrowSize = 0.42f;
+        [Min(0.01f)] public float arrowFlightDuration = 0.18f;
+        [Min(0.01f)] public float muzzlePopSize = 0.38f;
+        [Min(0.01f)] public float mageWaveHeight = 0.9f;
+        [Min(0.01f)] public float mageWaveDuration = 0.4f;
+
+        [Header("Bomber explosion")]
+        public Color bomberBlastColor = new(1f, 0.478f, 0f, 1f);
+        public Color bomberBlastCore = new(1f, 0.882f, 0.302f, 1f);
+        [Min(0f)] public float bomberShakePx = 5f;
+        [Min(0f)] public float bomberShakeDuration = 0.25f;
+        [Min(0f)] public float bomberKnockback = 0.3f;
+        [Min(0.01f)] public float bomberKnockbackDuration = 0.2f;
+
+        [Header("Boss entrance and defeat")]
+        [Min(0f)] public float bossEntranceShakePx = 8f;
+        [Min(0f)] public float bossEntranceShakeDuration = 0.3f;
+        public Vector2 bossLandSquash = new(1.3f, 0.7f);
+        public string bossLabel = "BOSS!";
+        [Min(0f)] public float defeatShakePx = 6f;
+        [Min(0f)] public float baseHitShakePx = 4f;
+        [Min(0f)] public float baseHitShakeDuration = 0.18f;
+        [Min(0f)] public float defeatShakeDuration = 0.4f;
 
         /// <summary>Converts a distance in 1080-reference screen px to world units.</summary>
         public float PxToWorld(float px)

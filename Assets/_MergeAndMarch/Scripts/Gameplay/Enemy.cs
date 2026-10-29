@@ -47,6 +47,24 @@ namespace MergeAndMarch.Gameplay
         public bool IsAlive => currentHP > 0.01f && !isDying;
         public static IReadOnlyList<Enemy> ActiveEnemies => activeEnemyBuffer;
 
+        /// <summary>Half the body height in world units, including size scale.</summary>
+        public float VisualHalfHeight => baseSpriteSize.y * 0.5f * Mathf.Abs(transform.lossyScale.y);
+
+        /// <summary>
+        /// Centre-to-centre distance at which this enemy stops in front of a troop: feet meet the
+        /// troop's head, with a small overlap set by GameConfig.enemyContactOverlap.
+        /// </summary>
+        public float GetContactDistance(Troop troop)
+        {
+            if (troop == null || gameConfig == null)
+            {
+                return gameConfig != null ? gameConfig.enemyEngageDistance : 0.3f;
+            }
+
+            float contact = (VisualHalfHeight + troop.VisualHalfHeight) * gameConfig.enemyContactOverlap;
+            return Mathf.Max(gameConfig.enemyEngageDistance, contact);
+        }
+
         private void Reset()
         {
             CacheComponents();
@@ -83,6 +101,11 @@ namespace MergeAndMarch.Gameplay
             }
 
             if (TryTriggerBomberInRowZone())
+            {
+                return;
+            }
+
+            if (Data.enemyType == EnemyType.Boss && SlideToOccupiedLane())
             {
                 return;
             }
@@ -126,7 +149,6 @@ namespace MergeAndMarch.Gameplay
         private bool TryTriggerBomberInRowZone()
         {
             battleGrid.GetTroops(troopBuffer);
-            float triggerReach = Mathf.Max(0.05f, gameConfig.bomberTriggerReach);
 
             for (int i = 0; i < troopBuffer.Count; i++)
             {
@@ -144,6 +166,8 @@ namespace MergeAndMarch.Gameplay
                     continue;
                 }
 
+                // Enemies now stop at body contact, so the Bomber must trigger at least that far out.
+                float triggerReach = Mathf.Max(gameConfig.bomberTriggerReach, GetContactDistance(troop) + 0.05f);
                 float distanceToTroop = transform.position.y - troop.transform.position.y;
                 if (distanceToTroop < -0.05f || distanceToTroop > triggerReach)
                 {
@@ -270,12 +294,72 @@ namespace MergeAndMarch.Gameplay
             impactRoutine = StartCoroutine(ImpactRoutine());
         }
 
+        /// <summary>
+        /// Boss only: when its lane has no troops left, it slides sideways to the nearest lane that
+        /// still has one instead of walking into the base, so the finale is a fight to the end.
+        /// Returns true while sliding.
+        /// </summary>
+        private bool SlideToOccupiedLane()
+        {
+            if (LaneHasTroop(LaneColumn))
+            {
+                return false;
+            }
+
+            int best = -1;
+            int bestDistance = int.MaxValue;
+            int columns = Mathf.Max(1, gameConfig.columns);
+            for (int column = 0; column < columns; column++)
+            {
+                int distance = Mathf.Abs(column - LaneColumn);
+                if (distance < bestDistance && LaneHasTroop(column))
+                {
+                    best = column;
+                    bestDistance = distance;
+                }
+            }
+
+            if (best < 0)
+            {
+                return false;
+            }
+
+            float targetX = battleGrid.GetSlotWorldPosition(best, 0).x;
+            Vector3 position = transform.position;
+            position.x = Mathf.MoveTowards(position.x, targetX, moveSpeed * 2f * Time.deltaTime);
+            transform.position = position;
+            lanePosition = position;
+            bean?.SetMarching(true);
+            if (Mathf.Abs(position.x - targetX) < 0.01f)
+            {
+                LaneColumn = best;
+            }
+
+            return true;
+        }
+
+        private bool LaneHasTroop(int column)
+        {
+            battleGrid.GetTroops(troopBuffer);
+            for (int i = 0; i < troopBuffer.Count; i++)
+            {
+                Troop troop = troopBuffer[i];
+                if (troop != null && troop.IsCombatActive && troop.Column == column)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private void MoveForward()
         {
             transform.position += Vector3.down * (moveSpeed * Time.deltaTime);
             lanePosition = transform.position;
             if (!hasEscaped && transform.position.y < failY)
             {
+                // Walked past the troops: hits the base once (WaveManager applies baseDamage) and is gone.
                 hasEscaped = true;
                 owner?.NotifyEnemyEscaped(this);
                 Destroy(gameObject);
@@ -303,7 +387,7 @@ namespace MergeAndMarch.Gameplay
                 }
 
                 float distanceToTroop = transform.position.y - troop.transform.position.y;
-                if (distanceToTroop < -0.05f || distanceToTroop > gameConfig.enemyEngageDistance)
+                if (distanceToTroop < -0.05f || distanceToTroop > GetContactDistance(troop))
                 {
                     continue;
                 }
@@ -412,6 +496,40 @@ namespace MergeAndMarch.Gameplay
             bean.SetMarchRate(Data.enemyType == EnemyType.Rusher ? juice.rusherMarchRate : 1f);
             bean.SetMarching(true);
             baseSpriteSize = Data.beanBody.bounds.size;
+            PlaceHpBarAboveBean(juice);
+
+            if (Data.enemyType == EnemyType.Boss)
+            {
+                bean.Squash(juice.bossLandSquash, 0.08f, 0.25f);
+                JuiceFx.Instance?.BossEntrance(transform.position);
+            }
+        }
+
+        /// <summary>Enemy HP bar above the head: a pill 70% of body width, 14 px tall (art bible Section 7).</summary>
+        private void PlaceHpBarAboveBean(JuiceConfig juice)
+        {
+            ResolveHpBarReferences();
+            if (hpBarRoot == null || hpBarRoot.transform is not RectTransform barRect)
+            {
+                return;
+            }
+
+            float canvasScale = Mathf.Max(0.0001f, barRect.localScale.x);
+            float bodyWidth = Data.beanBody.bounds.size.x * 0.55f;
+            barRect.anchoredPosition = new Vector2(0f, bean.TopLocalY + 0.05f);
+            barRect.sizeDelta = new Vector2(bodyWidth * 0.7f / canvasScale, juice.PxToWorld(14f) / canvasScale);
+        }
+
+        /// <summary>Pushes the enemy away from an explosion and back (art bible: Bomber knockback).</summary>
+        public void Knockback(Vector3 direction)
+        {
+            if (bean == null || !IsAlive || direction.sqrMagnitude < 0.0001f)
+            {
+                return;
+            }
+
+            JuiceConfig juice = bean.Config;
+            bean.Recoil(direction, juice.bomberKnockback, juice.bomberKnockbackDuration);
         }
 
         private void PlayBeanHit(Troop source)

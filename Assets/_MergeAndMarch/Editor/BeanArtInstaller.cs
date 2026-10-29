@@ -139,6 +139,10 @@ namespace MergeAndMarch.Editor
             art.fxGlow = Sprite("FX/vfx_glow.png", report);
             art.fxShadow = Sprite("FX/vfx_shadow.png", report);
             art.fxCoin = Sprite("FX/vfx_coin.png", report);
+            art.fxSlash = Sprite("FX/vfx_slash.png", report);
+            art.fxArrow = Sprite("FX/vfx_arrow.png", report);
+            art.fxVignette = Sprite("FX/vfx_vignette.png", report);
+            art.iconHourglass = Sprite("UI/ui_icon_hourglass.png", report);
         }
 
         private static Sprite Sprite(string relativePath, StringBuilder report)
