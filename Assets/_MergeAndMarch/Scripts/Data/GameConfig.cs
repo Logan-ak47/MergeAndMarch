@@ -49,6 +49,12 @@ namespace MergeAndMarch.Data
         [Range(0.02f, 0.5f)] public float laneGuideMarkerScale = 0.16f;
         public Color laneGuideTint = new(1f, 1f, 1f, 0.16f);
         public Color laneGuideMarkerTint = new(1f, 1f, 1f, 0.18f);
+        [Range(0.2f, 1f)] public float laneStripWidthScale = 0.86f;
+        [Tooltip("Spawn gate sits this far above the enemy spawn line.")]
+        public float laneGateOffset = 0.35f;
+        [Min(0.05f)] public float laneGateHeight = 0.5f;
+        public Color laneGateTint = new(0.114f, 0.078f, 0.259f, 0.85f);
+        public Color laneGateMouthTint = new(0.941f, 0.157f, 0.247f, 0.75f);
 
         [Header("Merge")]
         [Range(0.01f, 1f)] public float tacticalSlowTimeScale = 0.2f;
@@ -61,7 +67,7 @@ namespace MergeAndMarch.Data
 
         [Header("Combat")]
         [Min(0.01f)] public float enemyBaseScale = 1f;
-        [Min(0.1f)] public float enemySpawnYOffset = 2.2f;
+        [Min(0.1f)] public float enemySpawnYOffset = 3.3f;
         [Min(0.1f)] public float enemyFailOffset = 0.8f;
         [Tooltip("Minimum centre-to-centre stop distance; the real stop distance also scales with body size.")]
         [Min(0.05f)] public float enemyEngageDistance = 0.3f;
@@ -76,9 +82,58 @@ namespace MergeAndMarch.Data
         [Min(0.1f)] public float enemySpawnIntervalMin = 0.3f;
         [Min(0.1f)] public float enemySpawnIntervalMax = 0.5f;
 
+        [Header("Lane defence (design/specs/lane-defence.md)")]
+        [Tooltip("Front-row Knights pull enemies from lanes within this many columns into their own lane.")]
+        [Min(0)] public int zocLanes = 1;
+        [Tooltip("Most enemies one Knight can have pulled in at once; extras walk past.")]
+        [Min(0)] public int zocCapacity = 2;
+        [Tooltip("Extra vertical reach (units) beyond contact distance at which a Knight starts pulling.")]
+        [Min(0f)] public float zocReachExtra = 0.15f;
+        [Min(0.01f)] public float zocPullDuration = 0.25f;
+        [Tooltip("Last stand applies when this many or fewer lanes still hold a troop.")]
+        [Min(0)] public int lastStandOccupiedLanes = 1;
+        [Tooltip("Where enemies decide to turn: fraction of the way from the spawn line down to the grid top.")]
+        [Range(0f, 1f)] public float lastStandLineFraction = 0.5f;
+        [Min(0.1f)] public float lastStandLateralSpeedMult = 1.5f;
+        public Color laneThreatTint = new(0.941f, 0.157f, 0.247f, 0.32f);
+        [Min(0.05f)] public float laneThreatPulsePeriod = 0.6f;
+
         [Header("Base")]
         [Tooltip("Base health; enemies that get past the troops damage it. The run is lost at 0.")]
         [Min(1f)] public float baseMaxHP = 100f;
+        [Tooltip("Distance from the bottom edge of the grid to the egg's centre (direction 2026-11-03).")]
+        [Min(0f)] public float eggOffset = 0.5f;
+        [Min(0.1f)] public float eggSize = 0.95f;
+        [Tooltip("HP fractions at which the egg shows crack state 1 and 2.")]
+        public float[] eggCrackRatios = { 0.67f, 0.34f };
+
+        [Header("Offer tray (design/specs/offer-tray.md)")]
+        [Tooltip("Distance from the bottom edge of the grid to the centre of the tray cards.")]
+        [Min(0.1f)] public float trayOffset = 1.85f;
+        [Min(0.1f)] public float trayCardWidth = 1.2f;
+        [Min(0.1f)] public float trayCardHeight = 0.95f;
+        [Min(1)] public int draftOfferCount = 3;
+        [Tooltip("DraftThreshold(n) = min(energyBase + energyStep * n, energyCap), n = drafts taken this run.")]
+        [Min(1f)] public float energyBase = 6f;
+        [Min(0f)] public float energyStep = 1f;
+        [Min(1f)] public float energyCap = 14f;
+        [Tooltip("Bonus kill energy on each wave clear, as a fraction of the current draft threshold.")]
+        [Range(0f, 1f)] public float waveClearEnergyFraction = 0.5f;
+        [Tooltip("Fraction of the threshold refunded when a card replaces a troop on a full grid.")]
+        [Range(0f, 1f)] public float replaceRefundFraction = 0.5f;
+        [Tooltip("Time scale of the short slow-mo pulse when an offer appears.")]
+        [Range(0.01f, 1f)] public float offerSlowMoScale = 0.3f;
+        [Min(0f)] public float offerSlowMoDuration = 1f;
+        public bool freeDraftAtRunStart = true;
+        [Min(0f)] public float baseHealOnWaveClear = 10f;
+        [Tooltip("Card picks happen after these waves.")]
+        public int[] cardPickWaves = { };
+
+        /// <summary>Kill energy needed for the next draft (design/specs/bench-draft-chapters.md, Formulas).</summary>
+        public float DraftThreshold(int draftsTaken)
+        {
+            return Mathf.Min(energyBase + (energyStep * Mathf.Max(0, draftsTaken)), Mathf.Max(energyBase, energyCap));
+        }
 
         [Header("Waves")]
         [Min(0f)] public float startWaveDelay = 0f;

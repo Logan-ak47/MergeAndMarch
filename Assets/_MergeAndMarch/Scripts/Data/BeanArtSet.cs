@@ -58,6 +58,10 @@ namespace MergeAndMarch.Data
         [Header("UI icons")]
         public Sprite iconHourglass;
 
+        [Header("Base (direction 2026-11-03)")]
+        [Tooltip("Protected egg: 0 = intact, 1 = cracked, 2 = badly cracked.")]
+        public Sprite[] eggStates = new Sprite[3];
+
         /// <summary>Returns the face sprite for a state; enemies fall back to the closest state they have.</summary>
         public Sprite GetFace(BeanFace face, bool enemy)
         {

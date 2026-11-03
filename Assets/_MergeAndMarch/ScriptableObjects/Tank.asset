@@ -22,6 +22,7 @@ MonoBehaviour:
   sizeScale: 1
   skipsFrontline: 0
   baseDamage: 25
+  energyValue: 3
   renderYOffset: 0
   sprite: {fileID: 21300000, guid: 1a43695d554dc2a459d56a108fbc4185, type: 3}
   beanBody: {fileID: 21300000, guid: aa9172a138222ac4485f7837d388fb69, type: 3}

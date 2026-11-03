@@ -265,6 +265,14 @@ namespace MergeAndMarch.Editor
                 return;
             }
 
+            DraftSystem draft = waveManager.Draft;
+            if (draft != null && draft.IsOpen && now >= nextActionAt)
+            {
+                PickDraft(draft);
+                nextActionAt = now + 0.05d;
+                return;
+            }
+
             if (waveManager.State == WaveManager.WaveState.Victory)
             {
                 FinalizeRun("Victory", bossCleared: true);
@@ -284,6 +292,114 @@ namespace MergeAndMarch.Editor
                     : runRng.NextDouble() < 0.4d && TryRandomMerge();
                 nextActionAt = now + (merged ? 0.03d : Mathf.Lerp(0.06f, 0.14f, (float)runRng.NextDouble()));
             }
+        }
+
+        /// <summary>
+        /// Offer tray (design/specs/offer-tray.md): Greedy merges a card into a matching tier-1 troop,
+        /// else deploys into an uncovered lane, else (grid full) replaces its weakest troop; Random
+        /// plays a random card to a random valid target; Passive only deploys (it never merges).
+        /// </summary>
+        private static void PickDraft(DraftSystem draft)
+        {
+            IReadOnlyList<TroopData> offers = draft.Offers;
+            if (offers.Count == 0 || mergeController.IsBusy)
+            {
+                return;
+            }
+
+            TroopBuffer.Clear();
+            battleGrid.GetTroops(TroopBuffer);
+            bool done = false;
+            if (currentPolicy == BotPolicy.Greedy)
+            {
+                for (int i = 0; i < offers.Count && !done; i++)
+                {
+                    Troop target = TroopBuffer.Find(troop => draft.CanMergeInto(i, troop));
+                    if (target != null && draft.TryMerge(i, target))
+                    {
+                        activeRun.OfferMerges++;
+                        done = true;
+                    }
+                }
+            }
+            else if (currentPolicy == BotPolicy.Random && runRng.NextDouble() < 0.4d)
+            {
+                int i = runRng.Next(offers.Count);
+                Troop target = TroopBuffer.Find(troop => draft.CanMergeInto(i, troop));
+                if (target != null && draft.TryMerge(i, target))
+                {
+                    activeRun.OfferMerges++;
+                    done = true;
+                }
+            }
+
+            if (!done)
+            {
+                int i = runRng.Next(offers.Count);
+                if (TryPickDeploySlot(offers[i], out int column, out int row))
+                {
+                    done = draft.TryDeploy(i, column, row);
+                    if (done)
+                    {
+                        activeRun.OfferDeploys++;
+                    }
+                }
+                else if (currentPolicy != BotPolicy.Passive && draft.IsGridFull() && TroopBuffer.Count > 0)
+                {
+                    Troop weakest = TroopBuffer.OrderBy(troop => troop.Tier).ThenBy(troop => troop.CurrentHP).First();
+                    done = draft.TryReplace(i, weakest);
+                    if (done)
+                    {
+                        activeRun.OfferReplaces++;
+                    }
+                }
+            }
+
+            if (done)
+            {
+                activeRun.DraftsTaken++;
+                if (activeWave != null)
+                {
+                    activeWave.Drafts++;
+                }
+            }
+        }
+
+        private static bool TryPickDeploySlot(TroopData data, out int column, out int row)
+        {
+            column = -1;
+            row = -1;
+            List<Vector2Int> empty = new();
+            battleGrid.GetEmptySlots(empty);
+            if (empty.Count == 0)
+            {
+                return false;
+            }
+
+            if (currentPolicy != BotPolicy.Greedy)
+            {
+                Vector2Int slot = empty[runRng.Next(empty.Count)];
+                column = slot.x;
+                row = slot.y;
+                return true;
+            }
+
+            // Greedy: an empty lane first, front row for melee/contact troops and back row for the rest.
+            int preferredRow = data != null && (data.troopType == TroopType.Knight || data.troopType == TroopType.Bomber) ? 0 : 1;
+            float bestScore = float.MinValue;
+            foreach (Vector2Int slot in empty)
+            {
+                bool laneCovered = battleGrid.GetTroopAt(slot.x, 0) != null || battleGrid.GetTroopAt(slot.x, 1) != null;
+                float score = (laneCovered ? 0f : 10f) + (slot.y == preferredRow ? 1f : 0f) + ((float)runRng.NextDouble() * 0.1f);
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    column = slot.x;
+                    row = slot.y;
+                }
+            }
+
+            return column >= 0;
         }
 
         private static void SetupSimulationContext()
@@ -441,6 +557,9 @@ namespace MergeAndMarch.Editor
             WaveStat bossWave = activeRun.Waves.LastOrDefault(wave => wave.IsBoss);
             activeRun.BossSeconds = bossCleared && bossWave != null ? bossWave.Duration : -1f;
             activeRun.Outcome = outcome;
+            activeRun.LossCause = bossCleared ? "-" : waveManager != null && waveManager.Base.IsDestroyed ? "Egg" : "Wipe";
+            activeRun.TroopsAliveAtEnd = GetTroopCount();
+            activeRun.EggHpAtEnd = waveManager != null ? waveManager.Base.CurrentHP : 0f;
             activeRun.WaveReached = waveManager != null ? waveManager.CurrentWave : 0;
             activeRun.BossCleared = bossCleared;
             activeRun.TotalCoins = waveManager != null ? waveManager.TotalCoins : 0;
@@ -823,8 +942,8 @@ namespace MergeAndMarch.Editor
 
             b.AppendLine("## Summary");
             b.AppendLine();
-            b.AppendLine("| Policy | Runs | Win % | Median death wave | Avg merges | First T2 | First T3 | Troops lost | Combat s | Est. run s | Boss TTK s |");
-            b.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|");
+            b.AppendLine("| Policy | Runs | Win % | Median death wave | Avg merges | Offers | Deploys | Card merges | Replaces | Egg deaths | Wipes | Troops alive at egg death | First T2 | First T3 | Troops lost | Combat s | Est. run s | Boss TTK s |");
+            b.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
             float overheadPerWave = originalConfig.IsCaptured ? originalConfig.TimeBetweenWaves + originalConfig.WaveClearedBannerDuration : 2.5f;
             foreach (BotPolicy policy in CompletedRuns.Select(run => run.Policy).Distinct())
             {
@@ -834,7 +953,7 @@ namespace MergeAndMarch.Editor
                 string deathWave = losses.Count > 0 ? Median(losses.Select(run => (float)run.WaveReached)).ToString("0") : "-";
                 float estRun = (float)runs.Average(run => run.CombatSeconds + (Mathf.Max(0, run.Waves.Count - 1) * overheadPerWave) + (run.CardPicks.Count * HumanCardPickSeconds));
                 string bossTtk = wins.Count > 0 ? wins.Average(run => run.BossSeconds).ToString("0.0") : "-";
-                b.AppendLine($"| {policy} | {runs.Count} | {100f * wins.Count / runs.Count:0} | {deathWave} | {runs.Average(run => run.TotalMerges):0.0} | {AverageWave(runs, run => run.FirstTierTwoWave)} | {AverageWave(runs, run => run.FirstTierThreeWave)} | {runs.Average(run => run.TroopsLost):0.0} | {runs.Average(run => run.CombatSeconds):0} | {estRun:0} | {bossTtk} |");
+                b.AppendLine($"| {policy} | {runs.Count} | {100f * wins.Count / runs.Count:0} | {deathWave} | {runs.Average(run => run.TotalMerges):0.0} | {runs.Average(run => run.DraftsTaken):0.0} | {runs.Average(run => run.OfferDeploys):0.0} | {runs.Average(run => run.OfferMerges):0.0} | {runs.Average(run => run.OfferReplaces):0.0} | {runs.Count(run => run.LossCause == "Egg")} | {runs.Count(run => run.LossCause == "Wipe")} | {(runs.Any(run => run.LossCause == "Egg") ? runs.Where(run => run.LossCause == "Egg").Average(run => run.TroopsAliveAtEnd).ToString("0.0") : "-")} | {AverageWave(runs, run => run.FirstTierTwoWave)} | {AverageWave(runs, run => run.FirstTierThreeWave)} | {runs.Average(run => run.TroopsLost):0.0} | {runs.Average(run => run.CombatSeconds):0} | {estRun:0} | {bossTtk} |");
             }
 
             b.AppendLine();
@@ -843,8 +962,8 @@ namespace MergeAndMarch.Editor
                 List<RunRecord> runs = CompletedRuns.Where(run => run.Policy == policy).ToList();
                 b.AppendLine($"## Per-wave: {policy}");
                 b.AppendLine();
-                b.AppendLine("| Wave | Runs reaching | Avg duration s | Avg peak alive | Avg closest (units) | Contact % | Avg troops lost | Avg base dmg |");
-                b.AppendLine("|---|---|---|---|---|---|---|---|");
+                b.AppendLine("| Wave | Runs reaching | Avg duration s | Avg peak alive | Avg closest (units) | Contact % | Avg troops lost | Avg base dmg | Avg drafts |");
+                b.AppendLine("|---|---|---|---|---|---|---|---|---|");
                 int maxWave = runs.SelectMany(run => run.Waves).Select(wave => wave.Wave).DefaultIfEmpty(0).Max();
                 for (int w = 1; w <= maxWave; w++)
                 {
@@ -857,7 +976,7 @@ namespace MergeAndMarch.Editor
                     List<WaveStat> withEnemies = stats.Where(wave => wave.Closest < float.MaxValue).ToList();
                     string closest = withEnemies.Count > 0 ? withEnemies.Average(wave => wave.Closest).ToString("0.00") : "-";
                     float contact = withEnemies.Count > 0 ? 100f * withEnemies.Count(wave => wave.Closest <= ContactDistance) / withEnemies.Count : 0f;
-                    b.AppendLine($"| {w} | {stats.Count} | {stats.Average(wave => wave.Duration):0.0} | {stats.Average(wave => wave.PeakAlive):0.0} | {closest} | {contact:0} | {stats.Average(wave => wave.TroopsLost):0.0} | {stats.Average(wave => wave.BaseDamage):0.0} |");
+                    b.AppendLine($"| {w} | {stats.Count} | {stats.Average(wave => wave.Duration):0.0} | {stats.Average(wave => wave.PeakAlive):0.0} | {closest} | {contact:0} | {stats.Average(wave => wave.TroopsLost):0.0} | {stats.Average(wave => wave.BaseDamage):0.0} | {stats.Average(wave => wave.Drafts):0.0} |");
                 }
 
                 b.AppendLine();
@@ -868,7 +987,7 @@ namespace MergeAndMarch.Editor
             foreach (RunRecord run in CompletedRuns)
             {
                 string cards = string.Join(", ", run.CardPicks.Select(pick => pick.Chosen.Split(' ')[0]));
-                b.AppendLine($"- {run.Policy} #{run.RunNumber}: {run.Outcome} at wave {run.WaveReached}, base dmg {run.Waves.Sum(wave => wave.BaseDamage):0}, merges {run.TotalMerges}, lost {run.TroopsLost}, combat {run.CombatSeconds:0}s, cards [{cards}]");
+                b.AppendLine($"- {run.Policy} #{run.RunNumber}: {run.Outcome} ({run.LossCause}, {run.TroopsAliveAtEnd} troops left, egg {run.EggHpAtEnd:0}) at wave {run.WaveReached}, base dmg {run.Waves.Sum(wave => wave.BaseDamage):0}, merges {run.TotalMerges}, lost {run.TroopsLost}, combat {run.CombatSeconds:0}s, cards [{cards}]");
             }
 
             string absolutePath = Path.Combine(absoluteDirectory, fileName);
@@ -1280,6 +1399,7 @@ namespace MergeAndMarch.Editor
             public int TroopsLost;
             public float BaseHpAtStart;
             public float BaseDamage;
+            public int Drafts;
         }
 
         private sealed class RunRecord
@@ -1302,6 +1422,13 @@ namespace MergeAndMarch.Editor
             public bool BossCleared;
             public int TotalCoins;
             public int TotalMerges;
+            public int DraftsTaken;
+            public int OfferDeploys;
+            public int OfferMerges;
+            public int OfferReplaces;
+            public string LossCause;
+            public int TroopsAliveAtEnd;
+            public float EggHpAtEnd;
             public string FinalBuffSummary;
         }
 

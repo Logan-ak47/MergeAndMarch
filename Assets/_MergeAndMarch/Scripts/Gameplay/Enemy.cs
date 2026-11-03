@@ -38,11 +38,19 @@ namespace MergeAndMarch.Gameplay
         private Coroutine impactRoutine;
         private Coroutine deathRoutine;
         private Vector3 lanePosition;
+        private int laneShiftTarget = -1;
+        private bool laneShiftDescends;
+        private bool lastStandDecided;
+        private Troop zocHolder;
         private Vector3 configuredScale = Vector3.one;
         private float moveSpeed = 1f;
         private BeanVisual bean;
         public EnemyData Data { get; private set; }
         public int LaneColumn { get; private set; }
+        /// <summary>Damage dealt to the base if this enemy leaks; defaults to EnemyData.baseDamage.</summary>
+        public float BaseDamage { get; private set; }
+        /// <summary>Kill energy this enemy grants toward the next draft; defaults to EnemyData.energyValue.</summary>
+        public float EnergyValue { get; private set; }
         public float MaxHP => maxHP;
         public bool IsAlive => currentHP > 0.01f && !isDying;
         public static IReadOnlyList<Enemy> ActiveEnemies => activeEnemyBuffer;
@@ -110,7 +118,22 @@ namespace MergeAndMarch.Gameplay
                 return;
             }
 
+            if (UpdateLaneShift())
+            {
+                return;
+            }
+
             Troop blockingTroop = FindBlockingTroop();
+            if (blockingTroop == null && TryStartZoneOfControlPull())
+            {
+                return;
+            }
+
+            if (blockingTroop == null)
+            {
+                TryLastStandTurn();
+            }
+
             bean?.SetMarching(blockingTroop == null);
             if (blockingTroop == null)
             {
@@ -181,6 +204,13 @@ namespace MergeAndMarch.Gameplay
             return false;
         }
 
+        /// <summary>Overrides the leak damage and kill energy, e.g. for a mid-boss built from the boss data.</summary>
+        public void SetRewards(float baseDamage, float energyValue)
+        {
+            BaseDamage = Mathf.Max(0f, baseDamage);
+            EnergyValue = Mathf.Max(0f, energyValue);
+        }
+
         public void Initialize(
             EnemyData enemyData,
             GameConfig config,
@@ -195,6 +225,8 @@ namespace MergeAndMarch.Gameplay
             float moveSpeedMultiplier = 1f)
         {
             Data = enemyData;
+            BaseDamage = enemyData != null ? enemyData.baseDamage : 0f;
+            EnergyValue = enemyData != null ? enemyData.energyValue : 0f;
             gameConfig = config;
             battleGrid = grid;
             owner = enemySpawner;
@@ -336,6 +368,181 @@ namespace MergeAndMarch.Gameplay
             }
 
             return true;
+        }
+
+        /// <summary>True for enemies the lane-defence rules apply to (not flyers, not the boss).</summary>
+        private bool FollowsLaneDefence => Data != null && !Data.skipsFrontline && Data.enemyType != EnemyType.Boss;
+
+        /// <summary>
+        /// Moves the enemy sideways toward <see cref="laneShiftTarget"/>: a quick pull (no descent) for
+        /// zone of control, or a diagonal slide while descending for the last-stand turn. Returns true
+        /// while a pull is in progress (the enemy does nothing else that frame).
+        /// </summary>
+        private bool UpdateLaneShift()
+        {
+            if (laneShiftTarget < 0)
+            {
+                return false;
+            }
+
+            if (!laneShiftDescends && (zocHolder == null || !zocHolder.IsCombatActive))
+            {
+                laneShiftTarget = -1;
+                zocHolder = null;
+                return false;
+            }
+
+            float targetX = battleGrid.GetSlotWorldPosition(laneShiftTarget, 0).x;
+            float lateralSpeed = laneShiftDescends
+                ? moveSpeed * gameConfig.lastStandLateralSpeedMult
+                : gameConfig.cellSize / Mathf.Max(0.01f, gameConfig.zocPullDuration);
+            Vector3 position = transform.position;
+            position.x = Mathf.MoveTowards(position.x, targetX, lateralSpeed * Time.deltaTime);
+            transform.position = position;
+            lanePosition = position;
+            if (Mathf.Abs(position.x - targetX) < 0.01f)
+            {
+                LaneColumn = laneShiftTarget;
+                laneShiftTarget = -1;
+            }
+
+            // A last-stand slide keeps descending through the normal MoveForward below.
+            if (laneShiftDescends)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Zone of control (design/specs/lane-defence.md, rule 1): a front-row Knight within
+        /// <c>zocLanes</c> columns and contact range pulls this enemy into its lane, up to
+        /// <c>zocCapacity</c> pulled enemies per Knight.
+        /// </summary>
+        private bool TryStartZoneOfControlPull()
+        {
+            if (!FollowsLaneDefence || gameConfig.zocLanes <= 0 || gameConfig.zocCapacity <= 0)
+            {
+                return false;
+            }
+
+            if (zocHolder != null && zocHolder.IsCombatActive && zocHolder.Column == LaneColumn)
+            {
+                return false;
+            }
+
+            zocHolder = null;
+            battleGrid.GetTroops(troopBuffer);
+            Troop best = null;
+            int bestLanes = int.MaxValue;
+            for (int i = 0; i < troopBuffer.Count; i++)
+            {
+                Troop troop = troopBuffer[i];
+                if (troop == null || !troop.IsCombatActive || troop.Row != 0 || troop.Data == null || troop.Data.troopType != TroopType.Knight)
+                {
+                    continue;
+                }
+
+                int lanes = Mathf.Abs(troop.Column - LaneColumn);
+                if (lanes == 0 || lanes > gameConfig.zocLanes || lanes >= bestLanes)
+                {
+                    continue;
+                }
+
+                float distance = transform.position.y - troop.transform.position.y;
+                if (distance < -0.05f || distance > GetContactDistance(troop) + gameConfig.zocReachExtra)
+                {
+                    continue;
+                }
+
+                if (CountPulledBy(troop) >= gameConfig.zocCapacity)
+                {
+                    continue;
+                }
+
+                best = troop;
+                bestLanes = lanes;
+            }
+
+            if (best == null)
+            {
+                return false;
+            }
+
+            zocHolder = best;
+            laneShiftTarget = best.Column;
+            laneShiftDescends = false;
+            bean?.Squash(new Vector2(1.15f, 0.85f), 0.06f, 0.12f);
+            return true;
+        }
+
+        private static int CountPulledBy(Troop knight)
+        {
+            int count = 0;
+            for (int i = 0; i < activeEnemyBuffer.Count; i++)
+            {
+                Enemy enemy = activeEnemyBuffer[i];
+                if (enemy != null && enemy.IsAlive && enemy.zocHolder == knight)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// Last stand (design/specs/lane-defence.md, rule 2): with at most <c>lastStandOccupiedLanes</c>
+        /// lanes holding a troop, an enemy in an empty lane decides once, at the halfway line, to slide
+        /// to the lane beside the nearest troop, where zone of control can catch it.
+        /// </summary>
+        private void TryLastStandTurn()
+        {
+            if (lastStandDecided || !FollowsLaneDefence || laneShiftTarget >= 0)
+            {
+                return;
+            }
+
+            Bounds grid = battleGrid.GetGridWorldBounds();
+            float lineY = grid.max.y + (gameConfig.enemySpawnYOffset * (1f - gameConfig.lastStandLineFraction));
+            if (transform.position.y > lineY)
+            {
+                return;
+            }
+
+            lastStandDecided = true;
+            int columns = Mathf.Max(1, gameConfig.columns);
+            int occupied = 0;
+            int nearest = -1;
+            for (int column = 0; column < columns; column++)
+            {
+                if (!LaneHasTroop(column))
+                {
+                    continue;
+                }
+
+                occupied++;
+                if (nearest < 0 || Mathf.Abs(column - LaneColumn) < Mathf.Abs(nearest - LaneColumn))
+                {
+                    nearest = column;
+                }
+            }
+
+            if (occupied == 0 || occupied > gameConfig.lastStandOccupiedLanes || LaneHasTroop(LaneColumn))
+            {
+                return;
+            }
+
+            int offset = Mathf.Clamp(LaneColumn - nearest, -1, 1);
+            int target = Mathf.Clamp(nearest + (gameConfig.zocLanes > 0 ? offset : 0), 0, columns - 1);
+            if (target == LaneColumn)
+            {
+                return;
+            }
+
+            laneShiftTarget = target;
+            laneShiftDescends = true;
         }
 
         private bool LaneHasTroop(int column)

@@ -143,6 +143,12 @@ namespace MergeAndMarch.Editor
             art.fxArrow = Sprite("FX/vfx_arrow.png", report);
             art.fxVignette = Sprite("FX/vfx_vignette.png", report);
             art.iconHourglass = Sprite("UI/ui_icon_hourglass.png", report);
+            art.eggStates = new[]
+            {
+                Sprite("UI/ui_egg_0.png", report),
+                Sprite("UI/ui_egg_1.png", report),
+                Sprite("UI/ui_egg_2.png", report)
+            };
         }
 
         private static Sprite Sprite(string relativePath, StringBuilder report)

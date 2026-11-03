@@ -686,6 +686,7 @@ MonoBehaviour:
   battleGrid: {fileID: 942182596}
   targetCamera: {fileID: 1582025892}
   waveManager: {fileID: 0}
+  draft: {fileID: 0}
 --- !u!4 &963990068
 Transform:
   m_ObjectHideFlags: 0
@@ -918,7 +919,7 @@ MonoBehaviour:
   verticalPadding: 1
   framingOffset: {x: 0, y: 0}
   updateContinuouslyInEditor: 1
-  gridViewportAnchor: {x: 0.5, y: 0.24}
+  gridViewportAnchor: {x: 0.5, y: 0.4}
 --- !u!81 &1582025894
 AudioListener:
   m_ObjectHideFlags: 0
@@ -936,7 +937,7 @@ Transform:
   m_GameObject: {fileID: 1582025891}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.3903334, z: -10}
+  m_LocalPosition: {x: 0, y: -2.0116668, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1312,9 +1313,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MergeAndMarch.Gameplay.EnemySpawner
   gameConfig: {fileID: 0}
+  waveConfig: {fileID: 0}
   battleGrid: {fileID: 0}
   enemyPrefab: {fileID: 0}
   gruntData: {fileID: 0}
+  rusherData: {fileID: 0}
+  tankData: {fileID: 0}
+  flyerData: {fileID: 0}
+  bossData: {fileID: 0}
   enemyRoot: {fileID: 0}
 --- !u!4 &1950915565
 Transform:

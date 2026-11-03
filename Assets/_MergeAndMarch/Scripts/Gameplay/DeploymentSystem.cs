@@ -24,10 +24,14 @@ namespace MergeAndMarch.Gameplay
         [SerializeField] private TroopData bomberData;
         [SerializeField] private Transform troopRoot;
 
-        public int DeployTroopsForNextWave()
+        /// <summary>
+        /// Between-wave deploys now come only from the Reinforcements card; the random troop per wave
+        /// was replaced by the kill-energy draft (design/specs/bench-draft-chapters.md).
+        /// </summary>
+        public int DeployCardReinforcements()
         {
             ResolveReferences();
-            int deployCount = 1;
+            int deployCount = 0;
             if (CardSystem.Instance != null)
             {
                 deployCount += Mathf.Max(0, CardSystem.Instance.runBuffs.extraDeployCount);
@@ -77,6 +81,31 @@ namespace MergeAndMarch.Gameplay
 
             SpawnTroop(troopData, slot.x, slot.y, animate);
             return true;
+        }
+
+        /// <summary>Creates a tier-1 troop off the grid (for the bench) and plays its pop-in.</summary>
+        public Troop CreateTroop(TroopData troopData, Vector3 worldPosition)
+        {
+            ResolveReferences();
+            if (troopData == null || troopPrefab == null || gameConfig == null)
+            {
+                return null;
+            }
+
+            Transform parent = troopRoot != null ? troopRoot : transform;
+            Troop troopInstance = Instantiate(troopPrefab, parent);
+            troopInstance.Initialize(troopData, -1, -1, gameConfig, 1);
+            troopInstance.SetBattleGrid(battleGrid);
+            troopInstance.SetGridPosition(worldPosition, -1, -1);
+            StartCoroutine(PlayDeployPopIn(troopInstance));
+            return troopInstance;
+        }
+
+        /// <summary>The weighted troop pool drafts are rolled from (each entry is one weight).</summary>
+        public void GetDraftPool(List<TroopData> results)
+        {
+            ResolveReferences();
+            BuildWeightedTroopPool(results);
         }
 
         private void SpawnTroop(TroopData troopData, int column, int row, bool animate)

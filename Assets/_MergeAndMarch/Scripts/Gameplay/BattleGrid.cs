@@ -17,6 +17,7 @@ namespace MergeAndMarch.Gameplay
         [SerializeField] private Transform laneVisualRoot;
 
         private Troop[,] occupants;
+        private readonly List<SpriteRenderer> laneStrips = new();
         private SpriteRenderer[,] slotVisuals;
 
         public GameConfig Config => config;
@@ -40,6 +41,47 @@ namespace MergeAndMarch.Gameplay
         private void LateUpdate()
         {
             UpdateSlotVisuals();
+            UpdateLaneThreats();
+        }
+
+        /// <summary>
+        /// Threat telegraph (design/specs/lane-defence.md, rule 3): a lane with an enemy in it and no
+        /// troop to stop it pulses red.
+        /// </summary>
+        private void UpdateLaneThreats()
+        {
+            if (config == null || laneStrips.Count == 0)
+            {
+                return;
+            }
+
+            float bottom = GetGridWorldBounds().min.y;
+            float pulse = 0.5f + (0.5f * Mathf.Sin(Time.unscaledTime * Mathf.PI * 2f / Mathf.Max(0.05f, config.laneThreatPulsePeriod)));
+            IReadOnlyList<Enemy> enemies = Enemy.ActiveEnemies;
+            for (int column = 0; column < laneStrips.Count && column < config.columns; column++)
+            {
+                SpriteRenderer strip = laneStrips[column];
+                if (strip == null)
+                {
+                    continue;
+                }
+
+                bool defended = false;
+                for (int row = 0; row < config.rows && !defended; row++)
+                {
+                    Troop troop = GetTroopAt(column, row);
+                    defended = troop != null && troop.IsCombatActive;
+                }
+
+                bool threatened = false;
+                for (int i = 0; !defended && i < enemies.Count && !threatened; i++)
+                {
+                    Enemy enemy = enemies[i];
+                    threatened = enemy != null && enemy.IsAlive && enemy.LaneColumn == column && enemy.transform.position.y > bottom;
+                }
+
+                strip.color = threatened ? Color.Lerp(config.laneGuideTint, config.laneThreatTint, pulse) : config.laneGuideTint;
+            }
         }
 
         public void SetConfig(GameConfig gameConfig)
@@ -356,49 +398,46 @@ namespace MergeAndMarch.Gameplay
             }
 
             ClearVisualChildren(laneVisualRoot);
+            laneStrips.Clear();
 
-            Sprite sprite = GetRuntimeSquareSprite();
+            // Lanes as ground strips from the spawn gate down to the grid, so the battlefield reads as
+            // a place (art-director review 2026-11-03), replacing the faint dotted guides.
+            Sprite strip = GetRuntimeRoundedFillSprite();
             Bounds bounds = GetGridWorldBounds();
-            float lineBottom = bounds.max.y + (config.cellSize * 0.2f);
-            float lineTop = lineBottom + config.laneGuideHeight;
-            float lineHeight = Mathf.Max(0.5f, lineTop - lineBottom);
-            float lineWidth = Mathf.Max(0.04f, config.cellSize * config.laneGuideWidthScale);
-            float markerSize = Mathf.Max(0.08f, config.cellSize * config.laneGuideMarkerScale);
-            const int segmentCount = 3;
+            // Strips run through the grid down to the egg so a leak visibly follows its lane.
+            float bottom = bounds.min.y - config.eggOffset;
+            float gateY = bounds.max.y + config.enemySpawnYOffset + config.laneGateOffset;
+            float height = Mathf.Max(0.5f, gateY - bottom);
+            float laneWidth = config.cellSize * config.laneStripWidthScale;
 
             for (int column = 0; column < config.columns; column++)
             {
                 Vector3 laneCenter = GetSlotWorldPosition(column, 0);
+                SpriteRenderer lane = CreateLaneRenderer($"LaneStrip_{column}", strip, config.laneGuideTint, -3);
+                lane.transform.position = new Vector3(laneCenter.x, bottom + (height * 0.5f), 0f);
+                lane.transform.localScale = new Vector3(laneWidth, height, 1f);
+                laneStrips.Add(lane);
 
-                for (int segment = 0; segment < segmentCount; segment++)
-                {
-                    float segmentHeight = lineHeight / segmentCount;
-                    float segmentCenterY = lineBottom + (segmentHeight * (segment + 0.5f));
-                    float fade = 1f - (segment * 0.28f);
-
-                    GameObject line = new($"LaneGuide_{column}_{segment}");
-                    line.transform.SetParent(laneVisualRoot, false);
-                    line.transform.position = new Vector3(laneCenter.x, segmentCenterY, 0f);
-                    line.transform.localScale = new Vector3(lineWidth, segmentHeight * 0.92f, 1f);
-
-                    SpriteRenderer lineRenderer = line.AddComponent<SpriteRenderer>();
-                    lineRenderer.sprite = sprite;
-                    lineRenderer.color = WithAlpha(config.laneGuideTint, config.laneGuideTint.a * fade);
-                    lineRenderer.sortingLayerName = "Grid";
-                    lineRenderer.sortingOrder = -2;
-                }
-
-                GameObject marker = new($"LaneMarker_{column}");
-                marker.transform.SetParent(laneVisualRoot, false);
-                marker.transform.position = new Vector3(laneCenter.x, lineTop, 0f);
-                marker.transform.localScale = Vector3.one * markerSize;
-
-                SpriteRenderer markerRenderer = marker.AddComponent<SpriteRenderer>();
-                markerRenderer.sprite = sprite;
-                markerRenderer.color = WithAlpha(config.laneGuideMarkerTint, config.laneGuideMarkerTint.a * 0.7f);
-                markerRenderer.sortingLayerName = "Grid";
-                markerRenderer.sortingOrder = -1;
+                SpriteRenderer portal = CreateLaneRenderer($"LanePortal_{column}", strip, config.laneGateMouthTint, -1);
+                portal.transform.position = new Vector3(laneCenter.x, gateY, 0f);
+                portal.transform.localScale = new Vector3(laneWidth * 0.8f, config.laneGateHeight * 0.6f, 1f);
             }
+
+            SpriteRenderer gate = CreateLaneRenderer("SpawnGate", strip, config.laneGateTint, -2);
+            gate.transform.position = new Vector3(bounds.center.x, gateY, 0f);
+            gate.transform.localScale = new Vector3(bounds.size.x + (config.cellSize * 0.3f), config.laneGateHeight, 1f);
+        }
+
+        private SpriteRenderer CreateLaneRenderer(string objectName, Sprite sprite, Color color, int order)
+        {
+            GameObject go = new(objectName);
+            go.transform.SetParent(laneVisualRoot, false);
+            SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.color = color;
+            renderer.sortingLayerName = "Grid";
+            renderer.sortingOrder = order;
+            return renderer;
         }
 
         private void OnDrawGizmosSelected()
@@ -587,7 +626,7 @@ namespace MergeAndMarch.Gameplay
             return runtimeSquareSprite;
         }
 
-        private static Sprite GetRuntimeSlotOutlineSprite()
+        internal static Sprite GetRuntimeSlotOutlineSprite()
         {
             if (runtimeSlotOutlineSprite != null)
             {
@@ -618,6 +657,37 @@ namespace MergeAndMarch.Gameplay
             runtimeSlotOutlineSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
             runtimeSlotOutlineSprite.name = "BattleGridSlotOutline";
             return runtimeSlotOutlineSprite;
+        }
+
+        private static Sprite runtimeRoundedFillSprite;
+
+        /// <summary>Filled rounded rectangle, 1 world unit square, centre pivot (tray shelf and cards).</summary>
+        internal static Sprite GetRuntimeRoundedFillSprite()
+        {
+            if (runtimeRoundedFillSprite != null)
+            {
+                return runtimeRoundedFillSprite;
+            }
+
+            const int size = 64;
+            const float radius = 14f;
+            Texture2D texture = new(size, size, TextureFormat.RGBA32, false);
+            Color[] pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    pixels[(y * size) + x] = IsInsideRoundedRect(new Vector2(x + 0.5f, y + 0.5f), size, radius) ? Color.white : Color.clear;
+                }
+            }
+
+            texture.SetPixels(pixels);
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            texture.Apply();
+            runtimeRoundedFillSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
+            runtimeRoundedFillSprite.name = "RuntimeRoundedFill";
+            return runtimeRoundedFillSprite;
         }
 
         /// <summary>Arena gradient (art bible Sections 4 and 6), rebuilt if the configured colours change.</summary>

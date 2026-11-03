@@ -7,19 +7,20 @@ namespace MergeAndMarch.Gameplay
     /// <summary>
     /// The base behind the troop grid. Enemies that get past the troops walk into it and deal their
     /// EnemyData.baseDamage; the run is lost when it reaches zero (design decision 2026-10-27,
-    /// replacing "any leak ends the run"). Draws a placeholder world-space bar under the grid until
-    /// the UI pass replaces it.
+    /// replacing "any leak ends the run"). Shown as the protected egg under the grid, which cracks
+    /// as HP falls, with a small HP pill on its nest (direction 2026-11-03).
     /// </summary>
     public class BaseHealth : MonoBehaviour
     {
         private const float BarHeight = 0.14f;
-        private const float BarGap = 0.32f;
+        private const float HitDuration = 0.25f;
 
         private GameConfig config;
         private BattleGrid battleGrid;
         private SpriteRenderer track;
         private SpriteRenderer fill;
         private SpriteRenderer flash;
+        private SpriteRenderer egg;
         private float flashTimer;
         private float displayedRatio = 1f;
 
@@ -46,6 +47,18 @@ namespace MergeAndMarch.Gameplay
             UpdateBar();
         }
 
+        /// <summary>Restores base health, e.g. on wave clear (GameConfig.baseHealOnWaveClear).</summary>
+        public void Heal(float amount)
+        {
+            if (IsDestroyed || amount <= 0f)
+            {
+                return;
+            }
+
+            CurrentHP = Mathf.Min(MaxHP, CurrentHP + amount);
+            UpdateBar();
+        }
+
         /// <summary>Applies an escaped enemy's damage and plays the hit feedback.</summary>
         public void TakeHit(float damage, Vector3 hitPosition)
         {
@@ -55,8 +68,9 @@ namespace MergeAndMarch.Gameplay
             }
 
             CurrentHP = Mathf.Max(0f, CurrentHP - damage);
-            flashTimer = 0.25f;
-            JuiceFx.Instance?.BaseHit(hitPosition, damage);
+            flashTimer = HitDuration;
+            // Leaks land on the egg so the player sees what was hit (design/specs/lane-defence.md, rule 3).
+            JuiceFx.Instance?.BaseHit(egg != null ? egg.transform.position : hitPosition, damage);
             Damaged?.Invoke(damage, CurrentHP);
         }
 
@@ -81,6 +95,7 @@ namespace MergeAndMarch.Gameplay
             }
 
             Sprite white = Sprite.Create(Texture2D.whiteTexture, new Rect(0f, 0f, 4f, 4f), new Vector2(0f, 0.5f), 4f);
+            egg = CreateBar("Egg", null, 19);
             track = CreateBar("BaseTrack", white, 20);
             fill = CreateBar("BaseFill", white, 21);
             flash = CreateBar("BaseFlash", white, 22);
@@ -105,8 +120,12 @@ namespace MergeAndMarch.Gameplay
             }
 
             Bounds grid = battleGrid.GetGridWorldBounds();
-            float width = grid.size.x;
-            Vector3 origin = new(grid.min.x, grid.min.y - BarGap, 0f);
+            float eggSize = config != null ? config.eggSize : 0.95f;
+            Vector3 eggCentre = new(grid.center.x, grid.min.y - (config != null ? config.eggOffset : 0.5f), 0f);
+            UpdateEgg(eggCentre, eggSize);
+
+            float width = eggSize * 1.1f;
+            Vector3 origin = new(eggCentre.x - (width * 0.5f), eggCentre.y - (eggSize * 0.36f), 0f);
             JuiceConfig juice = JuiceFx.Instance != null ? JuiceFx.Instance.Config : null;
             Color ink = juice != null ? juice.ink : new Color(0.114f, 0.078f, 0.259f, 1f);
             Color danger = juice != null ? juice.enemyRed : new Color(0.941f, 0.157f, 0.247f, 1f);
@@ -115,9 +134,36 @@ namespace MergeAndMarch.Gameplay
             float ratio = Mathf.Clamp01(displayedRatio);
             Place(fill, origin, width * ratio, ratio > 0.3f ? Color.white : danger);
             Color flashColor = danger;
-            flashColor.a = flashTimer / 0.25f * 0.8f;
+            flashColor.a = flashTimer / HitDuration * 0.8f;
             Place(flash, origin, width * ratio, flashColor);
             flash.enabled = flashTimer > 0f;
+        }
+
+        /// <summary>Picks the crack state from HP and wobbles and reddens the egg while a hit is fresh.</summary>
+        private void UpdateEgg(Vector3 centre, float size)
+        {
+            BeanArtSet art = JuiceFx.Instance != null ? JuiceFx.Instance.Art : null;
+            float ratio = MaxHP > 0f ? CurrentHP / MaxHP : 0f;
+            int state = 0;
+            float[] cracks = config != null ? config.eggCrackRatios : null;
+            for (int i = 0; cracks != null && i < cracks.Length; i++)
+            {
+                if (ratio <= cracks[i])
+                {
+                    state = i + 1;
+                }
+            }
+
+            if (art != null && art.eggStates != null && art.eggStates.Length > 0)
+            {
+                egg.sprite = art.eggStates[Mathf.Clamp(state, 0, art.eggStates.Length - 1)];
+            }
+
+            float hit = flashTimer / HitDuration;
+            egg.transform.position = centre;
+            egg.transform.localScale = new Vector3(size * (1f + (0.08f * hit)), size * (1f - (0.08f * hit)), 1f);
+            egg.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin(Time.unscaledTime * 60f) * 8f * hit);
+            egg.color = Color.Lerp(Color.white, new Color(1f, 0.55f, 0.6f, 1f), hit);
         }
 
         private static void Place(SpriteRenderer renderer, Vector3 origin, float width, Color color)

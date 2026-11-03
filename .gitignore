@@ -96,3 +96,7 @@ crashlytics-build.properties
 /[Aa]ssets/Scripts/movecubes.cs.meta
 /[Aa]ssets/test.unity
 /[Aa]ssets/test.unity.meta
+
+# Studio tooling session logs written outside the repo root
+/Assets/**/production/
+/Assets/**/production.meta

@@ -539,6 +539,36 @@ def make_fx(out):
     glass.export(out / "UI" / "ui_icon_hourglass.png")
 
 
+# ---------------------------------------------------------------- protected egg (direction 2026-11-03)
+EGG = "#fff4d6"
+EGG_SPOT = "#2fd0ff"
+NEST = "#c77d3a"
+
+
+def make_egg(out):
+    """The base the beans protect: a speckled egg in a straw nest, three crack states (0 = intact)."""
+    cracks = [
+        [],
+        [[(128, 70), (118, 92), (134, 108), (122, 128)]],
+        [[(128, 70), (118, 92), (134, 108), (122, 128), (138, 150)],
+         [(92, 120), (108, 132), (98, 150), (112, 166)],
+         [(166, 112), (152, 128), (164, 144)]],
+    ]
+    for state, lines in enumerate(cracks):
+        c = Canvas(256)
+        egg = Union(Ellipse(128, 136, 70, 86), Ellipse(128, 168, 76, 56))
+        c.paint(egg, EGG, shade=34, gloss=Ellipse(94, 104, 10, 20))
+        for sx, sy, r in ((150, 96, 9), (104, 150, 7), (160, 176, 11), (122, 196, 6), (176, 140, 6)):
+            c.fill_only(Ellipse(sx, sy, r), EGG_SPOT, alpha=0.85)
+        for line in lines:
+            c.paint(Stroke(line, 7), INK, outline=0)
+        nest = Union(Ellipse(128, 214, 104, 30), RRect(30, 200, 226, 232, 16))
+        c.paint(nest, NEST, shade=30)
+        for x in range(48, 214, 22):
+            c.paint(Stroke([(x, 208), (x + 16, 224)], 5), darken(NEST, 0.7), outline=0)
+        c.export(out / "UI" / f"ui_egg_{state}.png")
+
+
 def main():
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "Assets/_MergeAndMarch/Sprites/Beans")
     for kind in TROOP_COLORS:
@@ -553,6 +583,7 @@ def main():
     for tier in (1, 2, 3):
         make_badge(tier, out)
     make_fx(out)
+    make_egg(out)
 
 
 if __name__ == "__main__":

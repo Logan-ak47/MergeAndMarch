@@ -13,6 +13,7 @@ namespace MergeAndMarch.Gameplay
         [SerializeField] private BattleGrid battleGrid;
         [SerializeField] private Camera targetCamera;
         [SerializeField] private WaveManager waveManager;
+        [SerializeField] private DraftSystem draft;
 
         private Troop draggedTroop;
         private Vector3 dragOffset;
@@ -30,9 +31,68 @@ namespace MergeAndMarch.Gameplay
             }
         }
 
+        /// <summary>True while a drag or a merge/swap animation is in progress.</summary>
+        public bool IsBusy => isResolving || draggedTroop != null;
+
+        /// <summary>Set by the offer tray while a card is being dragged, so troop drags cannot start.</summary>
+        public bool InputLocked { get; set; }
+
+        /// <summary>Wires the troop draft so its slow-mo pulse is not cancelled (design/specs/offer-tray.md).</summary>
+        public void SetDraft(DraftSystem draftSystem)
+        {
+            draft = draftSystem;
+        }
+
+        /// <summary>
+        /// Merges a troop that is not on the grid (an offer card dropped on a matching troop) into
+        /// <paramref name="target"/>, with the normal merge juice.
+        /// </summary>
+        public bool MergeIncoming(Troop incoming, Troop target)
+        {
+            if (isResolving || incoming == null || target == null || !incoming.CanMergeWith(target))
+            {
+                return false;
+            }
+
+            ClearAllHighlights();
+            StartCoroutine(ResolveMerge(incoming, target));
+            return true;
+        }
+
+        /// <summary>Highlights grid troops an offer card of this type could merge with and dims the rest.</summary>
+        public void HighlightOfferTargets(TroopType type)
+        {
+            ClearAllHighlights();
+            battleGrid.GetTroops(troopScanBuffer);
+            for (int i = 0; i < troopScanBuffer.Count; i++)
+            {
+                Troop troop = troopScanBuffer[i];
+                if (troop == null || !troop.IsInteractable)
+                {
+                    continue;
+                }
+
+                bool match = troop.Data != null && troop.Data.troopType == type && troop.Tier == 1;
+                troop.SetMergeHighlight(match);
+                troop.SetDimmed(!match);
+                (match ? highlightedTroops : dimmedTroops).Add(troop);
+            }
+        }
+
+        /// <summary>Clears offer-card highlights.</summary>
+        public void ClearOfferHighlights()
+        {
+            ClearAllHighlights();
+        }
+
         private void Update()
         {
             if (isResolving)
+            {
+                return;
+            }
+
+            if (draggedTroop == null && InputLocked)
             {
                 return;
             }
@@ -328,6 +388,12 @@ namespace MergeAndMarch.Gameplay
 
         private void RestoreTime()
         {
+            // An offer's slow-mo pulse owns the time scale until it ends.
+            if (draft != null && draft.IsSlowMoPulseActive)
+            {
+                return;
+            }
+
             if (TimeScaleManager.Instance != null)
             {
                 TimeScaleManager.Instance.ResetTimeScale();

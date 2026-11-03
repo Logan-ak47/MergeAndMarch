@@ -41,3 +41,7 @@ MonoBehaviour:
   fxArrow: {fileID: 21300000, guid: 43b37f8a11206b541a7846c06e8d02a7, type: 3}
   fxVignette: {fileID: 21300000, guid: be64ab2f0602b0c41b403acf68391016, type: 3}
   iconHourglass: {fileID: 21300000, guid: a25748ef522a08041ab250e580e0c6aa, type: 3}
+  eggStates:
+  - {fileID: 21300000, guid: bf29eb04b3b37e54f83961ce1ecd8f79, type: 3}
+  - {fileID: 21300000, guid: 2007d37595b8922448f30a6749670e05, type: 3}
+  - {fileID: 21300000, guid: 22a26ac25a2bafa4fa88f97bac8b3200, type: 3}

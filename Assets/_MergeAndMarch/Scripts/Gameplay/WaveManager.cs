@@ -29,7 +29,10 @@ namespace MergeAndMarch.Gameplay
         [SerializeField] private AutoCombat autoCombat;
         [SerializeField] private RunManager runManager;
         [SerializeField] private CardSystem cardSystem;
+        [SerializeField] private DraftSystem draft;
 
+        private MergeController mergeController;
+        private DraftTray tray;
         private Coroutine runRoutine;
         private Coroutine restartRoutine;
         private Canvas hudCanvas;
@@ -42,6 +45,7 @@ namespace MergeAndMarch.Gameplay
         private TextMeshProUGUI activeBuffsText;
         private TextMeshProUGUI waveClearedText;
         private TextMeshProUGUI runEndText;
+        private readonly System.Collections.Generic.List<Image> wavePips = new();
         private bool runActive;
         private bool runEnded;
         private BaseHealth baseHealth;
@@ -57,6 +61,7 @@ namespace MergeAndMarch.Gameplay
         public bool IsRunActive => runActive;
         public bool HasRunEnded => runEnded;
         public bool AutoRestartOnRunEnd { get; set; } = true;
+        public DraftSystem Draft => draft;
 
         private void Awake()
         {
@@ -120,6 +125,12 @@ namespace MergeAndMarch.Gameplay
             }
 
             cardSystem?.ResetRunBuffs();
+            draft?.ResetRun();
+            if (draft != null)
+            {
+                draft.AcceptingDrafts = true;
+            }
+
             battleGrid?.ResetTroopsForWaveStart();
             autoCombat?.SetCombatEnabled(true);
             autoCombat?.ResetAttackTimers();
@@ -170,11 +181,16 @@ namespace MergeAndMarch.Gameplay
 
                     State = WaveState.Deploying;
                     battleGrid?.ResetTroopsForWaveStart();
-                    deploymentSystem?.DeployTroopsForNextWave();
+                    deploymentSystem?.DeployCardReinforcements();
                     autoCombat?.ResetAttackTimers();
                 }
 
                 currentWave = waveNumber;
+                if (draft != null)
+                {
+                    draft.AcceptingDrafts = true;
+                }
+
                 State = waveNumber == bossWave ? WaveState.BossWave : WaveState.Combat;
                 UpdateWaveCounter();
                 enemySpawner?.SpawnWave(waveNumber);
@@ -203,14 +219,32 @@ namespace MergeAndMarch.Gameplay
         private IEnumerator RunPostWaveSequence(int clearedWave)
         {
             State = WaveState.WaveCleared;
+            EnsureBaseHealth().Heal(gameConfig != null ? gameConfig.baseHealOnWaveClear : 0f);
+            draft?.GrantWaveClearEnergy();
             yield return PlayWaveClearedRoutine();
 
             if (IsCardPickWave(clearedWave) && cardSystem != null)
             {
+                // A troop draft still open from the last kills finishes before the card pick starts.
+                yield return new WaitUntil(() => runEnded || draft == null || !draft.IsOpen);
+                if (runEnded)
+                {
+                    yield break;
+                }
+
+                if (draft != null)
+                {
+                    draft.AcceptingDrafts = false;
+                }
+
                 State = WaveState.CardPick;
                 cardPickCompleted = false;
                 cardSystem.StartCardPick();
                 yield return new WaitUntil(() => runEnded || cardPickCompleted);
+                if (draft != null && !runEnded)
+                {
+                    draft.AcceptingDrafts = true;
+                }
             }
         }
 
@@ -230,6 +264,7 @@ namespace MergeAndMarch.Gameplay
 
             runEnded = true;
             runActive = false;
+            StopDrafts();
             State = WaveState.Victory;
             autoCombat?.SetCombatEnabled(false);
             ShowRunEnd("VICTORY!");
@@ -248,6 +283,7 @@ namespace MergeAndMarch.Gameplay
 
             runEnded = true;
             runActive = false;
+            StopDrafts();
             totalCoins = Mathf.FloorToInt(totalCoins * 0.4f);
             UpdateCoinCounter();
             State = WaveState.Defeat;
@@ -257,6 +293,15 @@ namespace MergeAndMarch.Gameplay
             if (AutoRestartOnRunEnd)
             {
                 restartRoutine = StartCoroutine(RestartAfterDelay());
+            }
+        }
+
+        private void StopDrafts()
+        {
+            if (draft != null)
+            {
+                draft.AcceptingDrafts = false;
+                draft.Cancel();
             }
         }
 
@@ -273,7 +318,7 @@ namespace MergeAndMarch.Gameplay
                 return;
             }
 
-            float damage = enemy != null && enemy.Data != null ? enemy.Data.baseDamage : 10f;
+            float damage = enemy != null ? enemy.BaseDamage : 10f;
             Vector3 hitPosition = enemy != null ? enemy.transform.position : Vector3.zero;
             EnsureBaseHealth().TakeHit(damage, hitPosition);
             if (baseHealth.IsDestroyed)
@@ -308,7 +353,7 @@ namespace MergeAndMarch.Gameplay
 
         private bool IsCardPickWave(int waveNumber)
         {
-            return waveNumber == 3 || waveNumber == 6 || waveNumber == 9 || waveNumber == 12 || waveNumber == 15;
+            return gameConfig != null && gameConfig.cardPickWaves != null && System.Array.IndexOf(gameConfig.cardPickWaves, waveNumber) >= 0;
         }
 
         private void ResolveReferences()
@@ -354,6 +399,43 @@ namespace MergeAndMarch.Gameplay
                 {
                     cardSystem = runManager.gameObject.AddComponent<CardSystem>();
                 }
+            }
+
+            ResolveDraftAndTray();
+        }
+
+        /// <summary>Creates and wires the kill-energy offers and the offer tray (design/specs/offer-tray.md).</summary>
+        private void ResolveDraftAndTray()
+        {
+            GameObject host = runManager != null ? runManager.gameObject : gameObject;
+            if (draft == null)
+            {
+                draft = host.GetComponent<DraftSystem>();
+                if (draft == null)
+                {
+                    draft = host.AddComponent<DraftSystem>();
+                }
+            }
+
+            if (tray == null)
+            {
+                tray = host.GetComponent<DraftTray>();
+                if (tray == null)
+                {
+                    tray = host.AddComponent<DraftTray>();
+                }
+            }
+
+            if (mergeController == null)
+            {
+                mergeController = FindFirstObjectByType<MergeController>();
+            }
+
+            draft.Initialize(gameConfig, battleGrid, deploymentSystem, mergeController, enemySpawner);
+            tray.Initialize(gameConfig, battleGrid, draft, mergeController);
+            if (mergeController != null)
+            {
+                mergeController.SetDraft(draft);
             }
         }
 
@@ -413,7 +495,78 @@ namespace MergeAndMarch.Gameplay
                 runEndText = CreateText("RunEndText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600f, 120f), 52, TextAlignmentOptions.Center);
             }
 
+            // Publisher-test HUD (direction 2026-11-03): wave progress only. Coins, merges and the buffs
+            // panel stay tracked but hidden during a run.
+            SetHudVisible(coinCounterIcon, false);
+            SetHudVisible(coinCounterText, false);
+            SetHudVisible(mergeCounterText, false);
+            SetHudVisible(activeBuffsPanel, false);
+            SetHudVisible(activeBuffsText, false);
+            EnsureWavePips();
+
             HideCenterTexts();
+        }
+
+        private static void SetHudVisible(Graphic graphic, bool visible)
+        {
+            if (graphic != null)
+            {
+                graphic.gameObject.SetActive(visible);
+            }
+        }
+
+        /// <summary>One pip per wave under the wave pill; boss waves are larger and red.</summary>
+        private void EnsureWavePips()
+        {
+            int bossWave = enemySpawner != null ? enemySpawner.BossWave : 8;
+            if (wavePips.Count == bossWave)
+            {
+                return;
+            }
+
+            foreach (Image pip in wavePips)
+            {
+                if (pip != null)
+                {
+                    Destroy(pip.gameObject);
+                }
+            }
+
+            wavePips.Clear();
+            const float spacing = 38f;
+            for (int wave = 1; wave <= bossWave; wave++)
+            {
+                bool boss = IsBossPip(wave, bossWave);
+                float size = boss ? 30f : 20f;
+                float x = (wave - ((bossWave + 1) * 0.5f)) * spacing;
+                wavePips.Add(CreatePanel($"WavePip_{wave}", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 0.5f), new Vector2(x, -112f), new Vector2(size, size), Color.white));
+            }
+        }
+
+        private bool IsBossPip(int wave, int bossWave)
+        {
+            return wave == bossWave || (enemySpawner != null && enemySpawner.Waves.IsMidBossWave(wave));
+        }
+
+        private void UpdateWavePips()
+        {
+            EnsureWavePips();
+            int bossWave = enemySpawner != null ? enemySpawner.BossWave : 8;
+            Color done = Color.white;
+            Color current = new(1f, 0.761f, 0.102f, 1f);
+            Color upcoming = new(0.114f, 0.078f, 0.259f, 0.55f);
+            Color boss = new(0.941f, 0.157f, 0.247f, 1f);
+            for (int i = 0; i < wavePips.Count; i++)
+            {
+                int wave = i + 1;
+                Color color = wave < currentWave ? done : wave == currentWave ? current : upcoming;
+                if (IsBossPip(wave, bossWave) && wave >= currentWave)
+                {
+                    color = wave == currentWave ? current : boss;
+                }
+
+                wavePips[i].color = color;
+            }
         }
 
         private TextMeshProUGUI CreateText(string objectName, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition, Vector2 size, int fontSize, TextAlignmentOptions alignment)
@@ -487,16 +640,19 @@ namespace MergeAndMarch.Gameplay
                 return;
             }
 
+            UpdateWavePips();
+            int bossWave = enemySpawner != null ? enemySpawner.BossWave : 8;
             if (currentWave <= 0)
             {
-                waveCounterText.text = "Wave 1 / 15";
+                waveCounterText.text = $"WAVE 1/{bossWave}";
                 waveCounterText.color = Color.white;
                 waveCounterText.fontSize = 42;
                 return;
             }
 
-            bool isBoss = currentWave >= (enemySpawner != null ? enemySpawner.BossWave : 16);
-            waveCounterText.text = isBoss ? "BOSS" : $"Wave {currentWave} / 15";
+            bool isBoss = currentWave >= bossWave;
+            bool isMidBoss = enemySpawner != null && enemySpawner.Waves.IsMidBossWave(currentWave);
+            waveCounterText.text = isBoss ? "BOSS" : isMidBoss ? "MID-BOSS" : $"WAVE {currentWave}/{bossWave}";
             waveCounterText.color = isBoss ? new Color(1f, 0.78f, 0.16f, 1f) : Color.white;
             waveCounterText.fontSize = isBoss ? 48 : 42;
         }

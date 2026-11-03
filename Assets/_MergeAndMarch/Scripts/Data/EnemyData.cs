@@ -16,6 +16,8 @@ namespace MergeAndMarch.Data
         public bool skipsFrontline;
         [Tooltip("Damage dealt to the base when this enemy gets past the troops.")]
         [Min(0f)] public float baseDamage = 10f;
+        [Tooltip("Kill energy granted toward the next troop draft (design/specs/bench-draft-chapters.md).")]
+        [Min(0f)] public float energyValue = 1f;
         public float renderYOffset;
         public Sprite sprite;
 

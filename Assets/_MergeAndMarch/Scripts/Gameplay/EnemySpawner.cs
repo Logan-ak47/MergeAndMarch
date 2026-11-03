@@ -37,6 +37,8 @@ namespace MergeAndMarch.Gameplay
         public event Action<int> WaveClearedEvent;
         /// <summary>Raised when an enemy walks past the troops into the base.</summary>
         public event Action<Enemy> EnemyEscapedEvent;
+        /// <summary>Raised when an enemy is killed by troops.</summary>
+        public event Action<Enemy> EnemyDefeatedEvent;
 
         public int CurrentWave => currentWave;
 
@@ -129,6 +131,7 @@ namespace MergeAndMarch.Gameplay
         {
             defeatedThisWave++;
             activeEnemyCount = Mathf.Max(0, activeEnemyCount - 1);
+            EnemyDefeatedEvent?.Invoke(enemy);
             EvaluateWaveCleared();
         }
 
@@ -156,6 +159,11 @@ namespace MergeAndMarch.Gameplay
             }
             else
             {
+                if (Waves.IsMidBossWave(waveNumber) && bossData != null)
+                {
+                    SpawnMidBoss(waveNumber, spawnY, failY, parent);
+                }
+
                 List<EnemyData> waveEnemies = GetWaveEnemies(waveNumber);
                 BuildWaveSpawnColumns(waveEnemies.Count);
                 for (int i = 0; i < waveEnemies.Count; i++)
@@ -183,7 +191,36 @@ namespace MergeAndMarch.Gameplay
             SpawnEnemyAtColumn(data, waveNumber, spawnY, failY, parent, column, spawnedThisWave);
         }
 
-        private void SpawnEnemyAtColumn(EnemyData data, int waveNumber, float spawnY, float failY, Transform parent, int column, int spawnIndex)
+        /// <summary>Mid-boss: the boss body at reduced stats, down an occupied lane, with its own leak damage.</summary>
+        private void SpawnMidBoss(int waveNumber, float spawnY, float failY, Transform parent)
+        {
+            WaveConfig waves = Waves;
+            Enemy enemy = SpawnEnemyAtColumn(bossData, waveNumber, spawnY, failY, parent, PickOccupiedColumn(), spawnedThisWave,
+                waves.bossHpMultiplier * waves.midBossHpScale,
+                waves.bossAttackMultiplier * waves.midBossAttackScale,
+                bossData.sizeScale * waves.midBossScaleMultiplier);
+            enemy?.SetRewards(waves.midBossBaseDamage, bossData.energyValue);
+        }
+
+        private Enemy SpawnEnemyAtColumn(EnemyData data, int waveNumber, float spawnY, float failY, Transform parent, int column, int spawnIndex)
+        {
+            WaveConfig config = Waves;
+            bool isBoss = waveNumber >= config.bossWave;
+            float horde = isBoss ? 1f : Mathf.Max(1f, config.hordeMultiplier);
+            float healthMultiplier = isBoss ? config.bossHpMultiplier : config.HpMultiplier(waveNumber) / horde;
+            float attackMultiplier = isBoss ? config.bossAttackMultiplier : config.AttackMultiplier(waveNumber) / horde;
+            float scaleMultiplier = data != null && isBoss ? data.sizeScale * config.bossScaleMultiplier : (data != null ? data.sizeScale : 1f);
+            Enemy enemy = SpawnEnemyAtColumn(data, waveNumber, spawnY, failY, parent, column, spawnIndex, healthMultiplier, attackMultiplier, scaleMultiplier);
+            if (enemy != null && horde > 1f && enemy.Data != null)
+            {
+                enemy.SetRewards(enemy.Data.baseDamage / horde, enemy.Data.energyValue / horde);
+            }
+
+            return enemy;
+        }
+
+        private Enemy SpawnEnemyAtColumn(EnemyData data, int waveNumber, float spawnY, float failY, Transform parent, int column, int spawnIndex,
+            float healthMultiplier, float attackMultiplier, float scaleMultiplier)
         {
             if (data == null)
             {
@@ -196,10 +233,6 @@ namespace MergeAndMarch.Gameplay
             Vector3 spawnPosition = new(lanePos.x + xOffset, spawnY, 0f);
 
             WaveConfig waves = Waves;
-            bool isBoss = waveNumber >= waves.bossWave;
-            float healthMultiplier = isBoss ? waves.bossHpMultiplier : waves.HpMultiplier(waveNumber);
-            float attackMultiplier = isBoss ? waves.bossAttackMultiplier : waves.AttackMultiplier(waveNumber);
-            float scaleMultiplier = isBoss ? data.sizeScale * waves.bossScaleMultiplier : data.sizeScale;
             float variantDampener = waveNumber <= waves.earlyVariantWaves && data.enemyType != EnemyType.Grunt ? waves.earlyVariantHpMultiplier : 1f;
             float speedMultiplier = 1f;
             if (data.enemyType == EnemyType.Rusher && waveNumber <= waves.rusherSlowWaves)
@@ -226,6 +259,7 @@ namespace MergeAndMarch.Gameplay
                 speedMultiplier);
             spawnedThisWave++;
             activeEnemyCount++;
+            return enemy;
         }
 
         /// <summary>A random lane containing a troop, preferring lanes with a front-row troop.</summary>
@@ -273,11 +307,12 @@ namespace MergeAndMarch.Gameplay
             EnemyData t = tankData != null ? tankData : gruntData;
             EnemyData f = flyerData != null ? flyerData : gruntData;
             WaveConfig.WaveDefinition definition = Waves.GetWave(wave);
-            List<EnemyData> enemies = new(definition.Total);
-            AddEnemies(enemies, gruntData, definition.grunts);
-            AddEnemies(enemies, r, definition.rushers);
-            AddEnemies(enemies, t, definition.tanks);
-            AddEnemies(enemies, f, definition.flyers);
+            float horde = Mathf.Max(1f, Waves.hordeMultiplier);
+            List<EnemyData> enemies = new(Mathf.CeilToInt(definition.Total * horde));
+            AddEnemies(enemies, gruntData, Mathf.RoundToInt(definition.grunts * horde));
+            AddEnemies(enemies, r, Mathf.RoundToInt(definition.rushers * horde));
+            AddEnemies(enemies, t, Mathf.RoundToInt(definition.tanks * horde));
+            AddEnemies(enemies, f, Mathf.RoundToInt(definition.flyers * horde));
             return enemies;
         }
 

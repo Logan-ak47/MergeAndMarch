@@ -44,6 +44,11 @@ MonoBehaviour:
   laneGuideMarkerScale: 0.16
   laneGuideTint: {r: 1, g: 1, b: 1, a: 0.12}
   laneGuideMarkerTint: {r: 1, g: 1, b: 1, a: 0.18}
+  laneStripWidthScale: 0.86
+  laneGateOffset: 0.35
+  laneGateHeight: 0.5
+  laneGateTint: {r: 0.114, g: 0.078, b: 0.259, a: 0.85}
+  laneGateMouthTint: {r: 0.941, g: 0.157, b: 0.247, a: 0.75}
   tacticalSlowTimeScale: 0.2
   mergeSlideDuration: 0.15
   mergeFlashDuration: 0.1
@@ -52,7 +57,7 @@ MonoBehaviour:
   dragReturnDuration: 0.12
   swapMoveDuration: 0.12
   enemyBaseScale: 1
-  enemySpawnYOffset: 2.2
+  enemySpawnYOffset: 3.3
   enemyFailOffset: 0.8
   enemyEngageDistance: 0.3
   enemyContactOverlap: 0.8
@@ -64,6 +69,25 @@ MonoBehaviour:
   enemySpawnIntervalMin: 0.3
   enemySpawnIntervalMax: 0.5
   baseMaxHP: 150
+  eggOffset: 0.5
+  eggSize: 0.95
+  eggCrackRatios:
+  - 0.67
+  - 0.34
+  trayOffset: 1.85
+  trayCardWidth: 1.2
+  trayCardHeight: 0.95
+  draftOfferCount: 3
+  energyBase: 6
+  energyStep: 1
+  energyCap: 14
+  waveClearEnergyFraction: 0.5
+  replaceRefundFraction: 0.5
+  offerSlowMoScale: 0.3
+  offerSlowMoDuration: 1
+  freeDraftAtRunStart: 1
+  baseHealOnWaveClear: 10
+  cardPickWaves: 
   startWaveDelay: 0.6
   timeBetweenWaves: 1.5
   waveClearedBannerDuration: 1
